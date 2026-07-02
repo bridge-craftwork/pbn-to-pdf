@@ -1,6 +1,6 @@
 [package]
 name = "pbn-to-pdf"
-version = "0.17.0"
+version = "0.17.1"
 edition = "2021"
 description = "Convert PBN bridge files to PDF with Bridge Composer-style formatting"
 license = "Unlicense"
