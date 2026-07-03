@@ -12,32 +12,32 @@ See [README.md](README.md) for CLI usage, options, and examples.
 
 **Use `./dev-build.sh` for local development builds, not bare cargo.** This repo depends on the sibling `bridge-types` crate as a git dependency, with a gitignored `[patch]` override in `.cargo/config.toml` redirecting it to the local checkout in `../bridge-types`. Cargo never lets a `[patch]` override an existing `Cargo.lock` pin, so bare `cargo build` silently compiles the GitHub revision instead of your local edits — and if the patch does take effect, it rewrites `Cargo.lock` with a local-path entry that must never be committed (CI has no sibling checkouts). The script keeps a separate local lock (`.cargo/dev.lock`), swaps it in around the cargo call, verifies the patched crate resolved to the local checkout, and leaves the committed `Cargo.lock` untouched. It accepts any cargo subcommand and arguments (`./dev-build.sh test`, `./dev-build.sh run -- file.pbn -o out.pdf`); with no arguments it runs `cargo build`.
 
-Bare cargo is correct only when you *want* the committed lock's git pins — i.e. reproducing exactly what CI builds (pre-commit checks, release verification). The committed `Cargo.lock` must always pin `git+https://` sources for internal crates; never commit a lock where those entries have lost their `source =` lines.
+For CI-parity builds (pre-commit checks, release verification) use `./dev-build.sh --ci test` (any cargo subcommand works after `--ci`) — it temporarily disables the local patches and builds with the committed lock's git pins. **Avoid bare cargo for anything that resolves dependencies** (build/test/check/run): with the patches present, a same-version patch is applied immediately and silently rewrites `Cargo.lock` to local-path entries, while a version mismatch makes the patches silently ignored — both wrong. The committed `Cargo.lock` must always pin `git+https://` sources for the internal crates; never commit a lock where those entries have lost their `source =` lines.
 
 ```bash
 # Build the project
-cargo build
+./dev-build.sh
 
 # Build release version
-cargo build --release
+./dev-build.sh build --release
 
 # Run all tests
-cargo test
+./dev-build.sh test
 
 # Run integration tests only (generates PDFs in tests/output/)
-cargo test --test integration_test
+./dev-build.sh test --test integration_test
 
 # Run a specific integration test
-cargo test full_deck_compass --release
+./dev-build.sh test full_deck_compass --release
 
 # Check for clippy warnings
-cargo clippy
+./dev-build.sh clippy
 
-# Format code
+# Format code (no dependency resolution; bare cargo is fine)
 cargo fmt
 
 # Run with a PBN file
-cargo run -- path/to/file.pbn -o output.pdf
+./dev-build.sh run -- path/to/file.pbn -o output.pdf
 ```
 
 ## Architecture
