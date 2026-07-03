@@ -10,6 +10,10 @@ See [README.md](README.md) for CLI usage, options, and examples.
 
 ## Build and Test Commands
 
+**Use `./dev-build.sh` for local development builds, not bare cargo.** This repo depends on the sibling `bridge-types` crate as a git dependency, with a gitignored `[patch]` override in `.cargo/config.toml` redirecting it to the local checkout in `../bridge-types`. Cargo never lets a `[patch]` override an existing `Cargo.lock` pin, so bare `cargo build` silently compiles the GitHub revision instead of your local edits — and if the patch does take effect, it rewrites `Cargo.lock` with a local-path entry that must never be committed (CI has no sibling checkouts). The script keeps a separate local lock (`.cargo/dev.lock`), swaps it in around the cargo call, verifies the patched crate resolved to the local checkout, and leaves the committed `Cargo.lock` untouched. It accepts any cargo subcommand and arguments (`./dev-build.sh test`, `./dev-build.sh run -- file.pbn -o out.pdf`); with no arguments it runs `cargo build`.
+
+Bare cargo is correct only when you *want* the committed lock's git pins — i.e. reproducing exactly what CI builds (pre-commit checks, release verification). The committed `Cargo.lock` must always pin `git+https://` sources for internal crates; never commit a lock where those entries have lost their `source =` lines.
+
 ```bash
 # Build the project
 cargo build
