@@ -241,7 +241,8 @@ mod tests {
 
     #[test]
     fn test_final_contract() {
-        // N bids 1NT, E passes, S bids 3NT, so S is declarer
+        // N bids 1NT, E passes, S bids 3NT. North named notrump first, so
+        // North declares — not South, who made the last bid.
         let auction = parse_auction(Direction::North, "1NT Pass 3NT AP").unwrap();
         let contract = auction.final_contract().unwrap();
 
@@ -249,7 +250,18 @@ mod tests {
         assert_eq!(contract.suit, Strain::NoTrump);
         assert!(!contract.doubled);
         assert!(!contract.redoubled);
-        assert_eq!(contract.declarer, Direction::South);
+        assert_eq!(contract.declarer, Direction::North);
+    }
+
+    #[test]
+    fn test_final_contract_declarer_is_first_to_name_strain() {
+        // The plain raise: N opens 1S, S raises to 4S, N declares.
+        let auction = parse_auction(Direction::North, "1S Pass 4S AP").unwrap();
+        let contract = auction.final_contract().unwrap();
+
+        assert_eq!(contract.level, 4);
+        assert_eq!(contract.suit, Strain::Spades);
+        assert_eq!(contract.declarer, Direction::North);
     }
 
     #[test]

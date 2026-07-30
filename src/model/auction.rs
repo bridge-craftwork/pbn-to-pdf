@@ -89,38 +89,25 @@ impl Auction {
         }
     }
 
+    /// The final contract, if any (`None` if passed out)
+    ///
+    /// Contract resolution — in particular the declarer, which is the *first*
+    /// player of the contract side to name the final strain — lives in
+    /// `bridge-types`. This delegates instead of reimplementing it so the two
+    /// cannot drift apart; only the mapping into the local display-oriented
+    /// [`Contract`] happens here.
     pub fn final_contract(&self) -> Option<Contract> {
-        let mut last_bid: Option<(u8, Strain, Direction)> = None;
-        let mut doubled = false;
-        let mut redoubled = false;
-        let mut current_player = self.dealer;
+        // `notes` play no part in resolving the contract, so they are not
+        // carried across.
+        let mut core = bridge_types::Auction::new(self.dealer);
+        core.calls = self.calls.clone();
 
-        for annotated in &self.calls {
-            match &annotated.call {
-                Call::Bid { level, strain } => {
-                    last_bid = Some((*level, *strain, current_player));
-                    doubled = false;
-                    redoubled = false;
-                }
-                Call::Double => {
-                    doubled = true;
-                    redoubled = false;
-                }
-                Call::Redouble => {
-                    doubled = false;
-                    redoubled = true;
-                }
-                Call::Pass | Call::Continue | Call::Blank => {}
-            }
-            current_player = current_player.next();
-        }
-
-        last_bid.map(|(level, suit, declarer)| Contract {
-            level,
-            suit,
-            doubled,
-            redoubled,
-            declarer,
+        core.final_contract().map(|fc| Contract {
+            level: fc.level,
+            suit: fc.strain,
+            doubled: fc.doubled,
+            redoubled: fc.redoubled,
+            declarer: fc.declarer,
         })
     }
 }
