@@ -3,10 +3,10 @@
 //! Generates PDF documents for declarer play practice.
 //! Three layout variants:
 //! - **1-up**: One deal per page at full size
-//! - **2-up**: Two deals per page, each rotated 90° CW for landscape reading
+//! - **2-up**: Two deals side by side on a landscape page
 //! - **4-up**: Four deals per page in a 2x2 grid (original layout)
 
-use printpdf::{Color, CurTransMat, Mm, PdfDocument, PdfPage, PdfSaveOptions, Rgb};
+use printpdf::{Color, Mm, PdfDocument, PdfPage, PdfSaveOptions, Rgb};
 use std::collections::HashMap;
 
 use crate::config::Settings;
@@ -35,8 +35,6 @@ const SEPARATOR_COLOR: Rgb = Rgb {
 /// Padding inside each panel
 const PANEL_PADDING: f32 = 5.0;
 
-/// mm to PDF points conversion factor
-const MM_TO_PT: f32 = 2.834_645_7;
 
 // ---------------------------------------------------------------------------
 // Shared helpers
@@ -200,15 +198,15 @@ fn render_prepared(
     );
 }
 
-/// Draw a horizontal separator line across the content area
-fn draw_horizontal_separator(layer: &mut LayerBuilder, settings: &Settings, y: f32) {
+/// Draw the divider between two side-by-side panels on a landscape page.
+fn draw_vertical_separator(layer: &mut LayerBuilder, settings: &Settings, x: f32, page_height: f32) {
     layer.set_outline_color(Color::Rgb(SEPARATOR_COLOR));
     layer.set_outline_thickness(SEPARATOR_THICKNESS);
     layer.add_line(
-        Mm(settings.margin_left),
-        Mm(y),
-        Mm(settings.page_width - settings.margin_right),
-        Mm(y),
+        Mm(x),
+        Mm(settings.margin_bottom),
+        Mm(x),
+        Mm(page_height - settings.margin_top),
     );
 }
 
@@ -293,18 +291,27 @@ impl DeclarersPlan1UpRenderer {
 }
 
 // ---------------------------------------------------------------------------
-// 2-Up Renderer (rotated 90° CW)
+// 2-Up Renderer (landscape page)
 // ---------------------------------------------------------------------------
 
 /// Card scale for 2-up layout
 const SCALE_2UP: f32 = 0.45;
 
-/// Declarer's plan 2-up renderer — two deals per portrait page, each rotated 90° CW
+/// Declarer's plan 2-up renderer — two deals side by side on a landscape page
 ///
-/// Each half of the page contains one panel. The panel content is rendered in
-/// portrait orientation then rotated 90° clockwise, so the reader turns the
-/// page 90° counter-clockwise to read. This maximises the available vertical
-/// space for the tall declarer's plan layout.
+/// The tall declarer's-plan panel needs more height than width, so two of them
+/// sit naturally side by side across a landscape sheet. This previously drew
+/// them on a portrait page with each panel rotated a quarter turn, which put
+/// the same ink on the paper but left the page portrait: every reader had to
+/// turn the sheet (or the tablet) to use it, and a merged handout gave no way
+/// to tell these pages apart from the upright ones.
+///
+/// Emitting a genuinely landscape page fixes both. It also removes the rotation
+/// entirely — on a landscape page the panels are simply drawn upright — and it
+/// is what lets `pdf-handouts` recognise the page (it keys on the MediaBox
+/// being wider than it is tall) and turn the title and footer a quarter turn
+/// onto the short edges, so they still line up with every other page in the
+/// stack when printed.
 pub struct DeclarersPlan2UpRenderer {
     settings: Settings,
 }
@@ -326,29 +333,34 @@ impl DeclarersPlan2UpRenderer {
         let card_assets =
             CardAssets::load(&mut doc).map_err(|e| RenderError::CardAsset(e.to_string()))?;
 
-        let content_width =
-            self.settings.page_width - self.settings.margin_left - self.settings.margin_right;
-        let content_height =
-            self.settings.page_height - self.settings.margin_top - self.settings.margin_bottom;
-        let half_height = content_height / 2.0;
-        let center_y = self.settings.margin_bottom + half_height;
+        // The page is landscape: the settings carry portrait letter, so the two
+        // dimensions are swapped here rather than page size being plumbed through
+        // every layout. The margins keep their physical meaning (left/right are
+        // still the page's left and right).
+        let page_width = self.settings.page_height;
+        let page_height = self.settings.page_width;
 
-        // Slot centers (in page coordinates)
-        // Offset each slot away from the center divider for better visual balance
+        let content_width = page_width - self.settings.margin_left - self.settings.margin_right;
+        let content_height = page_height - self.settings.margin_top - self.settings.margin_bottom;
+        let half_width = content_width / 2.0;
+        let center_x = self.settings.margin_left + half_width;
+
+        // Slot centers (in page coordinates). The two panels sit side by side,
+        // each nudged away from the divider so they are not crowded against it.
         let center_inset = PANEL_PADDING * 2.0;
-        let slot_cx = self.settings.margin_left + content_width / 2.0;
-        let top_slot_cy = center_y + half_height / 2.0 + center_inset / 2.0;
-        let bottom_slot_cy = center_y - half_height / 2.0 - center_inset / 2.0;
+        let slot_cy = self.settings.margin_bottom + content_height / 2.0;
+        let left_slot_cx = center_x - half_width / 2.0 - center_inset / 2.0;
+        let right_slot_cx = center_x + half_width / 2.0 + center_inset / 2.0;
 
         let mut pages = Vec::new();
 
         for chunk in boards.chunks(2) {
             let mut layer = LayerBuilder::new();
 
-            // Draw horizontal separator between panels
-            draw_horizontal_separator(&mut layer, &self.settings, center_y);
+            // Draw vertical separator between the side-by-side panels
+            draw_vertical_separator(&mut layer, &self.settings, center_x, page_height);
 
-            let slot_centers = [(slot_cx, top_slot_cy), (slot_cx, bottom_slot_cy)];
+            let slot_centers = [(left_slot_cx, slot_cy), (right_slot_cx, slot_cy)];
 
             for (i, board) in chunk.iter().enumerate() {
                 let prep = prepare_board(board);
@@ -362,53 +374,26 @@ impl DeclarersPlan2UpRenderer {
                 );
                 let (dest_cx, dest_cy) = slot_centers[i];
 
-                // Virtual canvas: panel is rendered upright, then rotated 90° CW.
-                // After rotation, the panel's width maps to slot height and vice versa.
-                // Virtual canvas dimensions = (slot_height, slot_width) so that after
-                // rotation the panel fits within (slot_width, slot_height).
-                let canvas_w = half_height - PANEL_PADDING * 2.0;
-                let canvas_h = content_width - PANEL_PADDING * 2.0;
+                // The panel is drawn upright: on a landscape page its slot is
+                // already taller than it is wide, which is the shape the
+                // declarer's-plan panel wants. No rotation is involved.
+                let slot_h = content_height - PANEL_PADDING * 2.0;
 
                 let (panel_w, panel_h) =
                     renderer.dimensions(&prep.dummy_hand, &prep.declarer_hand, prep.is_nt);
 
-                // Panel origin (top-left) centered in virtual canvas
-                let panel_ox = (canvas_w - panel_w) / 2.0;
-                let panel_oy = canvas_h - (canvas_h - panel_h) / 2.0;
+                // Centre the panel in its slot. The origin is the panel's top-left,
+                // measured from the page's bottom-left like every other coordinate
+                // here, so the top edge is the slot centre plus half the height.
+                let panel_ox = dest_cx - panel_w / 2.0;
+                let panel_oy = dest_cy + panel_h.min(slot_h) / 2.0;
 
-                // Canvas center in virtual coords
-                let cx = canvas_w / 2.0;
-                let cy = canvas_h / 2.0;
-
-                // 90° CW rotation around canvas center, then translate to slot center.
-                // CW rotation matrix: [0, -1, 1, 0, 0, 0]
-                // maps (x, y) → (y, -x)
-                //
-                // Combined: rotate around (cx,cy) then translate to (dest_cx, dest_cy):
-                //   e = dest_cx - cy     (since c=1:  c*(-cy) + e = dest_cx - cx... let me derive)
-                //
-                // Full derivation:
-                //   (x,y) → rotate CW around (cx,cy) → translate to (dx,dy)
-                //   Step 1: x' = x - cx, y' = y - cy
-                //   Step 2 (CW): x'' = y', y'' = -x'  →  x'' = y-cy, y'' = -(x-cx) = cx-x
-                //   Step 3: x''' = x'' + dx, y''' = y'' + dy  →  x''' = y-cy+dx, y''' = cx-x+dy
-                //
-                // Matrix form [a,b,c,d,e,f] where x'=ax+cy+e, y'=bx+dy+f:
-                //   a=0, b=-1, c=1, d=0, e=dx-cy, f=dy+cx
-                let e_mm = dest_cx - cy;
-                let f_mm = dest_cy + cx;
-                let e_pt = e_mm * MM_TO_PT;
-                let f_pt = f_mm * MM_TO_PT;
-
-                layer.save_graphics_state();
-                layer.set_transform(CurTransMat::Raw([0.0, -1.0, 1.0, 0.0, e_pt, f_pt]));
                 render_prepared(&renderer, &mut layer, &prep, (Mm(panel_ox), Mm(panel_oy)));
-                layer.restore_graphics_state();
             }
 
             pages.push(PdfPage::new(
-                Mm(self.settings.page_width),
-                Mm(self.settings.page_height),
+                Mm(page_width),
+                Mm(page_height),
                 layer.into_ops(),
             ));
         }
