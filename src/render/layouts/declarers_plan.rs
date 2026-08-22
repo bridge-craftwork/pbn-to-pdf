@@ -7,7 +7,7 @@
 //! - **4-up**: Four deals per page in a 2x2 grid (original layout)
 
 use printpdf::{Color, Mm, PdfDocument, PdfPage, PdfSaveOptions, Rgb};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use crate::config::Settings;
 use crate::error::RenderError;
@@ -15,7 +15,7 @@ use crate::model::analysis::{find_length_winners, find_promotable_winners, find_
 use crate::model::{BidSuit, Board, Card, Deal, Direction, Hand};
 
 use crate::render::components::DeclarersPlanSmallRenderer;
-use crate::render::helpers::card_assets::CardAssets;
+use crate::render::helpers::card_assets::{CardAssets, CardFace};
 use crate::render::helpers::colors::{SuitColors, BLUE, GREEN, RED};
 use crate::render::helpers::compress::compress_pdf;
 use crate::render::helpers::fonts::FontManager;
@@ -34,7 +34,6 @@ const SEPARATOR_COLOR: Rgb = Rgb {
 
 /// Padding inside each panel
 const PANEL_PADDING: f32 = 5.0;
-
 
 // ---------------------------------------------------------------------------
 // Shared helpers
@@ -105,6 +104,27 @@ fn rotate_deal_for_declarer(deal: &Deal, declarer: Direction) -> (Hand, Hand) {
         Direction::East => (deal.west.clone(), deal.east.clone()),
         Direction::West => (deal.east.clone(), deal.west.clone()),
     }
+}
+
+/// The card renditions a whole document draws.
+///
+/// Registering all 52 full-size cards costs ~3.9MB because printpdf writes
+/// every XObject a document owns, drawn or not, and the twelve court-card
+/// illustrations dominate that. Collecting the set up front lets each document
+/// pay only for the renditions its boards actually use -- typically the
+/// reduced band and corner variants, with a full court card only on the rare
+/// board that exposes one.
+fn required_faces(boards: &[Board]) -> HashSet<(crate::model::Suit, crate::model::Rank, CardFace)> {
+    let mut needed = HashSet::new();
+    for board in boards {
+        let prep = prepare_board(board);
+        needed.extend(DeclarersPlanSmallRenderer::required_faces(
+            &prep.dummy_hand,
+            &prep.declarer_hand,
+            prep.trump,
+        ));
+    }
+    needed
 }
 
 /// Baseline card scale (4-up) — layout_scale is relative to this
@@ -199,7 +219,12 @@ fn render_prepared(
 }
 
 /// Draw the divider between two side-by-side panels on a landscape page.
-fn draw_vertical_separator(layer: &mut LayerBuilder, settings: &Settings, x: f32, page_height: f32) {
+fn draw_vertical_separator(
+    layer: &mut LayerBuilder,
+    settings: &Settings,
+    x: f32,
+    page_height: f32,
+) {
     layer.set_outline_color(Color::Rgb(SEPARATOR_COLOR));
     layer.set_outline_thickness(SEPARATOR_THICKNESS);
     layer.add_line(
@@ -246,8 +271,8 @@ impl DeclarersPlan1UpRenderer {
 
         let mut doc = PdfDocument::new(title);
         let fonts = FontManager::new(&mut doc)?;
-        let card_assets =
-            CardAssets::load(&mut doc).map_err(|e| RenderError::CardAsset(e.to_string()))?;
+        let card_assets = CardAssets::load_faces(&mut doc, &required_faces(boards))
+            .map_err(|e| RenderError::CardAsset(e.to_string()))?;
 
         let mut pages = Vec::new();
 
@@ -330,8 +355,8 @@ impl DeclarersPlan2UpRenderer {
 
         let mut doc = PdfDocument::new(title);
         let fonts = FontManager::new(&mut doc)?;
-        let card_assets =
-            CardAssets::load(&mut doc).map_err(|e| RenderError::CardAsset(e.to_string()))?;
+        let card_assets = CardAssets::load_faces(&mut doc, &required_faces(boards))
+            .map_err(|e| RenderError::CardAsset(e.to_string()))?;
 
         // The page is landscape: the settings carry portrait letter, so the two
         // dimensions are swapped here rather than page size being plumbed through
@@ -429,8 +454,8 @@ impl DeclarersPlanRenderer {
 
         let mut doc = PdfDocument::new(title);
         let fonts = FontManager::new(&mut doc)?;
-        let card_assets =
-            CardAssets::load(&mut doc).map_err(|e| RenderError::CardAsset(e.to_string()))?;
+        let card_assets = CardAssets::load_faces(&mut doc, &required_faces(boards))
+            .map_err(|e| RenderError::CardAsset(e.to_string()))?;
 
         let mut pages = Vec::new();
 

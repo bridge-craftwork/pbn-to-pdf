@@ -8,7 +8,7 @@ use printpdf::{CurTransMat, Mm, PaintMode, Rgb};
 use std::collections::HashMap;
 
 use crate::model::{Card, Hand, Rank, Suit};
-use crate::render::helpers::card_assets::{CardAssets, CARD_HEIGHT_MM, CARD_WIDTH_MM};
+use crate::render::helpers::card_assets::{CardAssets, CardFace, CARD_HEIGHT_MM, CARD_WIDTH_MM};
 use crate::render::helpers::colors::RED;
 use crate::render::helpers::layer::LayerBuilder;
 
@@ -151,25 +151,33 @@ impl<'a> FanRenderer<'a> {
 
     /// Get the suit order based on configuration
     fn suit_order(&self) -> [Suit; 4] {
-        let base_order = if self.alternate_colors {
-            ALTERNATING_SUIT_ORDER
-        } else {
-            STANDARD_SUIT_ORDER
-        };
+        fan_suit_order(self.first_suit, self.alternate_colors)
+    }
 
-        // Find the index of the first suit in the base order
-        let start_idx = base_order
-            .iter()
-            .position(|&s| s == self.first_suit)
-            .unwrap_or(0);
-
-        // Rotate the order so first_suit is first
-        [
-            base_order[start_idx],
-            base_order[(start_idx + 1) % 4],
-            base_order[(start_idx + 2) % 4],
-            base_order[(start_idx + 3) % 4],
-        ]
+    /// The cards this layout draws, left to right, with the rendition each needs.
+    ///
+    /// Cards overlap horizontally, so every card but the rightmost shows only
+    /// a narrow wedge down its left edge -- the index and nothing else. Court
+    /// cards would otherwise leak a vertical rail of their portrait frame into
+    /// that wedge, which reads as stray linework, so covered cards use the
+    /// corner rendition. Only the rightmost card is fully exposed.
+    ///
+    /// `render_internal` builds the same sequence, so the two stay in step.
+    pub fn faces(
+        hand: &Hand,
+        first_suit: Suit,
+        alternate_colors: bool,
+    ) -> Vec<(Suit, Rank, CardFace)> {
+        let mut cards: Vec<(Suit, Rank, CardFace)> = Vec::new();
+        for suit in fan_suit_order(first_suit, alternate_colors) {
+            for rank in hand.holding(suit).ranks.iter() {
+                cards.push((suit, *rank, CardFace::Corner));
+            }
+        }
+        if let Some(last) = cards.last_mut() {
+            last.2 = CardFace::Full;
+        }
+        cards
     }
 
     /// Get the scaled card dimensions
@@ -513,7 +521,16 @@ impl<'a> FanRenderer<'a> {
 
         // Render cards from left to right
         // Each card overlays the previous one, so the rightmost card (rendered last) is fully visible
+        let last_index = num_cards - 1;
         for (i, (suit, rank)) in cards.iter().enumerate() {
+            // Only the rightmost card is fully exposed; the rest show just
+            // their left-edge wedge, which the corner rendition covers.
+            let face = if i == last_index {
+                CardFace::Full
+            } else {
+                CardFace::Corner
+            };
+
             // Calculate rotation for this card
             // Leftmost card: +half_arc (counter-clockwise, tilts left)
             // Rightmost card: -half_arc (clockwise, tilts right)
@@ -568,7 +585,10 @@ impl<'a> FanRenderer<'a> {
                     self.scale,
                     rotation,
                 );
-                layer.use_xobject(self.card_assets.get(*suit, *rank).clone(), transform);
+                layer.use_xobject(
+                    self.card_assets.get_face(*suit, *rank, face).clone(),
+                    transform,
+                );
 
                 // Draw ellipse if this card is in the circled set
                 if let Some(color) = self.circled_cards.get(&Card::new(*suit, *rank)) {
@@ -580,7 +600,10 @@ impl<'a> FanRenderer<'a> {
                 let transform = self
                     .card_assets
                     .transform_at(base_x, card_bottom_y, self.scale);
-                layer.use_xobject(self.card_assets.get(*suit, *rank).clone(), transform);
+                layer.use_xobject(
+                    self.card_assets.get_face(*suit, *rank, face).clone(),
+                    transform,
+                );
 
                 // Draw ellipse if this card is in the circled set
                 if let Some(color) = self.circled_cards.get(&Card::new(*suit, *rank)) {
@@ -644,4 +667,25 @@ impl<'a> FanRenderer<'a> {
             PaintMode::Stroke,
         );
     }
+}
+
+/// Rotate the configured base order so `first_suit` leads.
+fn fan_suit_order(first_suit: Suit, alternate_colors: bool) -> [Suit; 4] {
+    let base_order = if alternate_colors {
+        ALTERNATING_SUIT_ORDER
+    } else {
+        STANDARD_SUIT_ORDER
+    };
+
+    let start_idx = base_order
+        .iter()
+        .position(|&s| s == first_suit)
+        .unwrap_or(0);
+
+    [
+        base_order[start_idx],
+        base_order[(start_idx + 1) % 4],
+        base_order[(start_idx + 2) % 4],
+        base_order[(start_idx + 3) % 4],
+    ]
 }

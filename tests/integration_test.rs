@@ -17,6 +17,7 @@ use pbn_to_pdf::render::generate_pdf;
 use pbn_to_pdf::render::helpers::colors::{SuitColors, BLUE, RED};
 use pbn_to_pdf::render::helpers::FontManager;
 use pbn_to_pdf::render::helpers::{CardAssets, LayerBuilder};
+use pbn_to_pdf::{render_boards, Layout, RenderOptions};
 use printpdf::{Mm, PdfDocument, PdfPage, PdfSaveOptions, PdfWarnMsg};
 
 fn fixtures_path() -> PathBuf {
@@ -1729,4 +1730,47 @@ fn test_colored_span_in_commentary() {
     let output_file = output_dir.join("colored_span_test.pdf");
     fs::write(&output_file, &pdf_bytes).expect("Failed to write test PDF");
     println!("Colored span test PDF written to: {:?}", output_file);
+}
+
+/// The declarer's plan layouts must not embed the full court-card artwork for
+/// cards they only ever show a sliver of.
+///
+/// Each of the twelve J/Q/K illustrations is 200KB-570KB in the PDF, and
+/// printpdf writes every XObject a document owns whether a page draws it or
+/// not. Registering all 52 full cards -- which is what a plain
+/// `CardAssets::load` does -- produced a 3.9MB file for these four boards
+/// regardless of content. The reduced band/corner variants plus selective
+/// registration bring it under 300KB, so a regression here means either the
+/// variants stopped being used or the whole deck is being registered again.
+#[test]
+fn test_declarers_plan_does_not_embed_unused_court_art() {
+    let output_dir = output_path();
+    fs::create_dir_all(&output_dir).expect("Failed to create output directory");
+
+    let input = fixtures_path().join("ABS2-2 Promotion and Length practice deals.pbn");
+    let content = fs::read_to_string(&input).expect("Failed to read fixture");
+    let boards = parse_pbn(&content).expect("Failed to parse fixture");
+
+    for (layout, name) in [
+        (Layout::DeclarersPlan1up, "declarers_plan_size_1up.pdf"),
+        (Layout::DeclarersPlan2up, "declarers_plan_size_2up.pdf"),
+        (Layout::DeclarersPlan, "declarers_plan_size_4up.pdf"),
+    ] {
+        let bytes = render_boards(&boards.boards, &[], layout, RenderOptions::default())
+            .expect("Failed to render");
+        fs::write(output_dir.join(name), &bytes).expect("Failed to write PDF");
+
+        // Generous headroom over the ~190KB these actually produce: this guards
+        // against the whole deck coming back, not against small drift.
+        assert!(
+            bytes.len() < 600_000,
+            "{name} is {} bytes; the full court-card artwork looks to be embedded again",
+            bytes.len()
+        );
+        assert!(
+            bytes.len() > 20_000,
+            "{name} is only {} bytes; the card artwork looks to have gone missing",
+            bytes.len()
+        );
+    }
 }

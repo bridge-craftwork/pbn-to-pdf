@@ -14,3 +14,4 @@
 # macOS
 .DS_Store
 activity-log.json
+__pycache__/

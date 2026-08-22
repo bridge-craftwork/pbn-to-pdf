@@ -19,6 +19,7 @@ pub fn compress_pdf(uncompressed: Vec<u8>) -> Result<Vec<u8>, String> {
         .map_err(|e| format!("Failed to parse PDF for compression: {}", e))?;
 
     repair_form_xobject_resources(&mut doc);
+    round_form_path_coordinates(&mut doc);
 
     // Compress all streams
     doc.compress();
@@ -29,6 +30,141 @@ pub fn compress_pdf(uncompressed: Vec<u8>) -> Result<Vec<u8>, String> {
         .map_err(|e| format!("Failed to save compressed PDF: {}", e))?;
 
     Ok(output.into_inner())
+}
+
+/// Decimal places kept for path coordinates in Form XObjects.
+///
+/// The card artwork is authored in the SVG's own coordinate space, which
+/// svg2pdf carries through at full float precision -- eight significant digits
+/// for a card drawn about 30mm wide. Two decimals in that space is finer than
+/// 1/1000 mm on paper, well under a pixel at any print resolution, and drops
+/// roughly a third of the bytes.
+const PATH_COORD_DECIMALS: usize = 2;
+
+/// Path-construction operators, whose operands are geometry we may round.
+///
+/// Deliberately excludes `cm`: those operands are a transformation matrix, and
+/// rounding a scale factor such as `4.1666665` rescales everything drawn under
+/// it. Only coordinates in the current space are safe to shorten.
+const PATH_OPERATORS: [&[u8]; 6] = [b"m", b"l", b"c", b"v", b"y", b"re"];
+
+/// Shorten path coordinates in every Form XObject's content stream.
+///
+/// Restricted to Form XObjects: they hold the card artwork, which is where
+/// essentially all the geometry lives, and they contain no text, so the
+/// scanner never has to reason about string operands. Page content streams are
+/// a few kilobytes and are left alone.
+fn round_form_path_coordinates(doc: &mut lopdf::Document) {
+    let form_ids: Vec<ObjectId> = doc
+        .objects
+        .iter()
+        .filter(|(_, object)| match object {
+            Object::Stream(stream) => stream
+                .dict
+                .get(b"Subtype")
+                .ok()
+                .and_then(|s| s.as_name().ok())
+                .map(|n| n == b"Form")
+                .unwrap_or(false),
+            _ => false,
+        })
+        .map(|(&id, _)| id)
+        .collect();
+
+    for id in form_ids {
+        let Some(Object::Stream(stream)) = doc.objects.get_mut(&id) else {
+            continue;
+        };
+        // printpdf leaves its streams uncompressed, so there is usually no
+        // filter to undo -- fall back to the raw bytes rather than skipping.
+        let content = stream
+            .decompressed_content()
+            .unwrap_or_else(|_| stream.content.clone());
+        let rounded = round_path_operands(&content);
+        if rounded.len() < content.len() {
+            stream.set_plain_content(rounded);
+        }
+    }
+}
+
+/// Rewrite a content stream, rounding the operands of path-construction
+/// operators and leaving every other token byte-for-byte intact.
+fn round_path_operands(content: &[u8]) -> Vec<u8> {
+    let mut out = Vec::with_capacity(content.len());
+    let mut pending: Vec<&[u8]> = Vec::new();
+    let mut i = 0;
+
+    while i < content.len() {
+        let c = content[i];
+        if c.is_ascii_whitespace() {
+            i += 1;
+            continue;
+        }
+        let start = i;
+        while i < content.len() && !content[i].is_ascii_whitespace() {
+            i += 1;
+        }
+        let token = &content[start..i];
+
+        if is_number(token) {
+            pending.push(token);
+            continue;
+        }
+
+        let round = PATH_OPERATORS.contains(&token);
+        for operand in pending.drain(..) {
+            if round {
+                out.extend_from_slice(&shorten(operand));
+            } else {
+                out.extend_from_slice(operand);
+            }
+            out.push(b' ');
+        }
+        out.extend_from_slice(token);
+        out.push(b'\n');
+    }
+
+    for operand in pending {
+        out.extend_from_slice(operand);
+        out.push(b' ');
+    }
+    out
+}
+
+fn is_number(token: &[u8]) -> bool {
+    let body = match token.first() {
+        Some(b'+') | Some(b'-') => &token[1..],
+        _ => token,
+    };
+    !body.is_empty()
+        && body.iter().all(|b| b.is_ascii_digit() || *b == b'.')
+        && body.iter().filter(|b| **b == b'.').count() <= 1
+        && body.iter().any(|b| b.is_ascii_digit())
+}
+
+/// Round one numeric operand, keeping the shorter of the two spellings.
+///
+/// Always fixed-point: exponent notation is not valid in a content stream, so
+/// formatting that could produce `1e-5` would silently corrupt the file.
+fn shorten(token: &[u8]) -> Vec<u8> {
+    let Ok(text) = std::str::from_utf8(token) else {
+        return token.to_vec();
+    };
+    let Ok(value) = text.parse::<f64>() else {
+        return token.to_vec();
+    };
+    let mut s = format!("{:.*}", PATH_COORD_DECIMALS, value);
+    if s.contains('.') {
+        s = s.trim_end_matches('0').trim_end_matches('.').to_string();
+    }
+    if s.is_empty() || s == "-0" || s == "-" {
+        s = "0".to_string();
+    }
+    if s.len() < token.len() {
+        s.into_bytes()
+    } else {
+        token.to_vec()
+    }
 }
 
 /// Resource names a Form XObject's content stream references, grouped by
