@@ -7,7 +7,7 @@ use printpdf::{Mm, PaintMode, Rgb};
 use std::collections::HashMap;
 
 use crate::model::{Card, Hand, Rank, Suit};
-use crate::render::helpers::card_assets::{CardAssets, CARD_HEIGHT_MM, CARD_WIDTH_MM};
+use crate::render::helpers::card_assets::{CardAssets, CardFace, CARD_HEIGHT_MM, CARD_WIDTH_MM};
 use crate::render::helpers::colors::RED;
 use crate::render::helpers::layer::LayerBuilder;
 
@@ -118,27 +118,63 @@ impl<'a> DummyRenderer<'a> {
 
     /// Get the suit order based on configuration
     fn suit_order(&self) -> [Suit; 4] {
-        let base_order = if self.alternate_colors {
-            ALTERNATING_SUIT_ORDER
-        } else {
-            STANDARD_SUIT_ORDER
-        };
-
-        // Find the index of the first suit in the base order
-        let start_idx = base_order
-            .iter()
-            .position(|&s| s == self.first_suit)
-            .unwrap_or(0);
-
-        // Rotate the order so first_suit is first
-        [
-            base_order[start_idx],
-            base_order[(start_idx + 1) % 4],
-            base_order[(start_idx + 2) % 4],
-            base_order[(start_idx + 3) % 4],
-        ]
+        suit_order_for(self.first_suit, self.alternate_colors)
     }
 
+    /// Which rendition of each card this layout draws for a hand.
+    ///
+    /// Cards are stacked highest-first and drawn in that order, so every card
+    /// but the lowest in a suit is covered down to `overlap_ratio` of its
+    /// height -- only that band is ever seen. The lowest card is fully
+    /// exposed and needs the complete illustration.
+    ///
+    /// `render` walks the same order, so the two cannot drift apart.
+    pub fn faces(
+        hand: &Hand,
+        first_suit: Suit,
+        alternate_colors: bool,
+    ) -> Vec<(Suit, Rank, CardFace)> {
+        let mut out = Vec::new();
+        for suit in suit_order_for(first_suit, alternate_colors) {
+            let ranks = hand.holding(suit).ranks.to_vec();
+            let last = ranks.len().saturating_sub(1);
+            for (i, rank) in ranks.iter().enumerate() {
+                let face = if i == last {
+                    CardFace::Full
+                } else {
+                    CardFace::Band
+                };
+                out.push((suit, *rank, face));
+            }
+        }
+        out
+    }
+}
+
+/// Rotate the configured base order so `first_suit` leads.
+fn suit_order_for(first_suit: Suit, alternate_colors: bool) -> [Suit; 4] {
+    let base_order = if alternate_colors {
+        ALTERNATING_SUIT_ORDER
+    } else {
+        STANDARD_SUIT_ORDER
+    };
+
+    // Find the index of the first suit in the base order
+    let start_idx = base_order
+        .iter()
+        .position(|&s| s == first_suit)
+        .unwrap_or(0);
+
+    // Rotate the order so first_suit is first
+    [
+        base_order[start_idx],
+        base_order[(start_idx + 1) % 4],
+        base_order[(start_idx + 2) % 4],
+        base_order[(start_idx + 3) % 4],
+    ]
+}
+
+impl<'a> DummyRenderer<'a> {
     /// Get the scaled card dimensions
     pub fn card_size(&self) -> (f32, f32) {
         self.card_assets.card_size_mm(self.scale)
@@ -220,8 +256,15 @@ impl<'a> DummyRenderer<'a> {
             // Render cards from top (highest rank) to bottom (lowest rank)
             // so that lower cards render on top and naturally cover the cards above.
             // The bottom card (lowest rank, last rendered) will be fully visible.
+            let last_index = ranks.len().saturating_sub(1);
             for (i, rank) in ranks.iter().enumerate() {
                 let card_top_y = origin.1 .0 - i as f32 * visible_height;
+                // Every card but the lowest is covered down to `visible_height`.
+                let face = if i == last_index {
+                    CardFace::Full
+                } else {
+                    CardFace::Band
+                };
 
                 // The bottom of this card
                 let card_bottom_y = card_top_y - card_height;
@@ -230,7 +273,10 @@ impl<'a> DummyRenderer<'a> {
                 let transform = self
                     .card_assets
                     .transform_at(col_x, card_bottom_y, self.scale);
-                layer.use_xobject(self.card_assets.get(*suit, *rank).clone(), transform);
+                layer.use_xobject(
+                    self.card_assets.get_face(*suit, *rank, face).clone(),
+                    transform,
+                );
 
                 // Draw ellipse if this card is in the circled set
                 if let Some(color) = self.circled_cards.get(&Card::new(*suit, *rank)) {

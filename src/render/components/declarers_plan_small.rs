@@ -16,7 +16,7 @@ use crate::model::{BidSuit, Board, Card, Hand, Suit};
 use crate::render::components::{
     DummyRenderer, FanRenderer, LosersTableRenderer, WinnersTableRenderer,
 };
-use crate::render::helpers::card_assets::{CardAssets, CARD_HEIGHT_MM};
+use crate::render::helpers::card_assets::{CardAssets, CardFace, CARD_HEIGHT_MM};
 use crate::render::helpers::colors::{SuitColors, BLACK};
 use crate::render::helpers::layer::LayerBuilder;
 use crate::render::helpers::text_metrics;
@@ -168,6 +168,24 @@ impl<'a> DeclarersPlanSmallRenderer<'a> {
             .first_suit(first_suit)
             .show_bounds(self.show_bounds)
             .circled_cards(hand_circled)
+    }
+
+    /// Every card rendition this panel draws for one board.
+    ///
+    /// The layouts use it to register only the XObjects a document actually
+    /// needs: printpdf writes every XObject added to a document whether or not
+    /// a page invokes it, and the full court-card illustrations are ~3.9MB.
+    /// It delegates to the same `faces` helpers the renderers draw from, so
+    /// the set can never fall out of step with what is drawn.
+    pub fn required_faces(
+        dummy: &Hand,
+        declarer: &Hand,
+        trump: Option<BidSuit>,
+    ) -> Vec<(Suit, crate::model::Rank, CardFace)> {
+        let first_suit = Self::first_suit_for_trump(trump);
+        let mut faces = DummyRenderer::faces(dummy, first_suit, true);
+        faces.extend(FanRenderer::faces(declarer, first_suit, true));
+        faces
     }
 
     /// Determine the first suit based on trump suit
