@@ -35,9 +35,13 @@ SVG = '{%s}' % SVG_NS
 CARD_W = 167.0869141
 CARD_H = 242.6669922
 
-# Visible fraction of a covered card.  DummyRenderer overlaps at 0.18 of card
-# height; a little margin keeps the clip edge underneath the covering card.
-BAND_FRACTION = 0.20
+# Visible fraction of a covered card. DummyRenderer overlaps at 0.18 of card
+# height, so the covering card's opaque background hides everything below that;
+# the margin here only has to clear its antialiased top edge. Ink density rises
+# steeply with depth into the band -- 5% of the slice at 4-6% down, 57% at
+# 16-18% -- so the last couple of percent are the expensive ones, and 0.185
+# costs a third less than 0.20 for a clip edge still 0.24mm out of sight.
+BAND_FRACTION = 0.185
 # A generous bound on the top-left index (rank glyph plus suit pip); used only
 # to sanity-check the pip we pick, never to select it. The index pips vary more
 # than you would expect -- the jack of diamonds reaches y=54.7 where most stop
