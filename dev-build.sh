@@ -33,20 +33,50 @@
 #   ./dev-build.sh --exec wasm-pack build ...
 #                                   # run an arbitrary cargo-invoking command
 #                                   # under the same lockfile protection
+#   ./dev-build.sh --workspace wasm test
+#                                   # protect wasm/Cargo.lock instead of the
+#                                   # root one -- wasm/ is a separate workspace
+#                                   # that still inherits this config's patches
 #
 set -euo pipefail
 cd "$(dirname "$0")"
 
 CONFIG=.cargo/config.toml
 CONFIG_OFF=.cargo/config.toml.ci-off
-DEV_LOCK=.cargo/dev.lock
-CI_LOCK_STASH=.cargo/ci.lock.swap
 
 ci_mode=""
 if [[ ${1:-} == --ci ]]; then
     ci_mode=1
     shift
 fi
+
+# Which crate's lockfile to protect. `wasm/` is its own workspace, but cargo
+# config discovery walks upward, so it inherits this config's [patch] overrides
+# and its lock is exposed to exactly the same rewrite. Default: the root.
+workspace=.
+if [[ ${1:-} == --workspace ]]; then
+    shift
+    if [[ $# -eq 0 ]]; then
+        echo "dev-build: --workspace needs a directory" >&2
+        exit 2
+    fi
+    workspace=${1%/}
+    shift
+    if [[ ! -f $workspace/Cargo.toml ]]; then
+        echo "dev-build: no Cargo.toml in $workspace" >&2
+        exit 2
+    fi
+fi
+
+LOCK=$workspace/Cargo.lock
+# The command runs *in* the selected workspace, so a plain `--workspace wasm
+# clippy` lints that crate rather than the root one. Paths in the caller's
+# arguments are therefore relative to it. Lock and config paths below stay
+# relative to the repo root, which is where this script keeps its own cwd.
+run() { ( cd "$workspace" && "${runner[@]}" "$@" ); }
+slug=$([[ $workspace == . ]] && echo dev || echo "dev-$(echo "$workspace" | tr / -)")
+DEV_LOCK=.cargo/$slug.lock
+CI_LOCK_STASH=.cargo/$slug.ci.swap
 
 # By default the arguments are a cargo subcommand; --exec instead runs the rest
 # as a command of its own (wasm-pack, cargo-nextest, ...). Those shell out to
@@ -67,18 +97,19 @@ fi
 
 # No local patch overrides: behave exactly like a direct invocation.
 if [[ ! -f $CONFIG ]] || ! grep -q '^\[patch\.' "$CONFIG"; then
-    exec "${runner[@]}" "$@"
+    run "$@"
+    exit $?
 fi
 
 # --- CI-parity mode: disable the patches, build with the committed lock ---
 if [[ -n $ci_mode ]]; then
     lock_before=""
-    [[ -f Cargo.lock ]] && lock_before=$(cksum < Cargo.lock)
+    [[ -f $LOCK ]] && lock_before=$(cksum < "$LOCK")
     mv "$CONFIG" "$CONFIG_OFF"
     restore_ci() { [[ -f $CONFIG_OFF ]] && mv "$CONFIG_OFF" "$CONFIG"; }
     trap restore_ci EXIT
-    "${runner[@]}" "$@"
-    if [[ -n $lock_before && $(cksum < Cargo.lock) != "$lock_before" ]]; then
+    run "$@"
+    if [[ -n $lock_before && $(cksum < "$LOCK") != "$lock_before" ]]; then
         echo "dev-build: NOTE: Cargo.lock was re-resolved during this CI-parity run." >&2
         echo "dev-build: review 'git diff Cargo.lock' — internal crates must keep their" >&2
         echo "dev-build: source = \"git+https://...\" lines before committing." >&2
@@ -94,8 +125,8 @@ patched=$(sed -n 's/^\([A-Za-z0-9_-]*\) *= *{ *path *=.*/\1/p' "$CONFIG")
 swapped=""
 restore() {
     if [[ -n $swapped ]]; then
-        [[ -f Cargo.lock ]] && mv Cargo.lock "$DEV_LOCK"
-        [[ -f $CI_LOCK_STASH ]] && mv "$CI_LOCK_STASH" Cargo.lock
+        [[ -f $LOCK ]] && mv "$LOCK" "$DEV_LOCK"
+        [[ -f $CI_LOCK_STASH ]] && mv "$CI_LOCK_STASH" "$LOCK"
     fi
 }
 trap restore EXIT
@@ -103,10 +134,19 @@ trap restore EXIT
 # If the committed (CI) lock is tracked, set it aside and use the dev lock;
 # cargo re-creates the dev lock from scratch if it doesn't exist yet, and a
 # fresh resolve does honor the config patches.
-if git ls-files --error-unmatch Cargo.lock >/dev/null 2>&1; then
+if git ls-files --error-unmatch "$LOCK" >/dev/null 2>&1; then
     swapped=1
-    mv Cargo.lock "$CI_LOCK_STASH"
-    [[ -f $DEV_LOCK ]] && mv "$DEV_LOCK" Cargo.lock
+    mv "$LOCK" "$CI_LOCK_STASH"
+    [[ -f $DEV_LOCK ]] && mv "$DEV_LOCK" "$LOCK"
+else
+    # Nothing to protect yet, so this run writes $LOCK directly -- and with the
+    # patches active that lock records local paths. Fine to build with, wrong to
+    # commit: CI has no sibling checkouts. Say so, because the resulting file
+    # looks perfectly ordinary.
+    echo "dev-build: NOTE: $LOCK is not tracked by git, so it is being written" >&2
+    echo "dev-build: with the local [patch] applied. Do not commit it as-is --" >&2
+    echo "dev-build: regenerate the committed lock with:" >&2
+    echo "dev-build:   mv $LOCK $DEV_LOCK && ./dev-build.sh --ci${workspace:+ --workspace $workspace} check" >&2
 fi
 
 # True when every patched crate that appears in the lock is path-resolved
@@ -114,8 +154,8 @@ fi
 verify() {
     local ok=0 crate
     for crate in $patched; do
-        grep -q "^name = \"$crate\"\$" Cargo.lock 2>/dev/null || continue
-        if grep -A2 "^name = \"$crate\"\$" Cargo.lock | grep -q '^source ='; then
+        grep -q "^name = \"$crate\"\$" "$LOCK" 2>/dev/null || continue
+        if grep -A2 "^name = \"$crate\"\$" "$LOCK" | grep -q '^source ='; then
             echo "dev-build: $crate still resolves to a remote source" >&2
             ok=1
         fi
@@ -123,14 +163,14 @@ verify() {
     return $ok
 }
 
-"${runner[@]}" "$@"
+run "$@"
 
-if [[ -f Cargo.lock ]] && ! verify; then
+if [[ -f $LOCK ]] && ! verify; then
     # Stale dev lock from before the patches existed; it is disposable —
     # discard it and re-resolve fresh, which applies the patches.
     echo "dev-build: discarding stale dev lock and re-resolving..." >&2
-    rm Cargo.lock
-    "${runner[@]}" "$@"
+    rm "$LOCK"
+    run "$@"
     verify || {
         echo "dev-build: ERROR: patched crates still resolve to remote sources." >&2
         echo "dev-build: check that the sibling checkouts in $CONFIG exist." >&2
@@ -139,7 +179,7 @@ if [[ -f Cargo.lock ]] && ! verify; then
 fi
 
 for crate in $patched; do
-    if grep -q "^name = \"$crate\"\$" Cargo.lock 2>/dev/null; then
+    if grep -q "^name = \"$crate\"\$" "$LOCK" 2>/dev/null; then
         echo "dev-build: ✓ $crate → local checkout"
     fi
 done

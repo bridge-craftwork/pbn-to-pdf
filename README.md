@@ -97,13 +97,16 @@ The renderer also builds for the browser and Node. `render_boards` is a pure
 so the wasm build needs no filesystem and no network.
 
 ```bash
-./wasm-build.sh                                  # bundler package in pkg/
+./wasm-build.sh                                  # bundler package in wasm/pkg/
 ./wasm-build.sh --target nodejs --out-dir pkg-node
 ./wasm-build.sh --target web                     # for a plain <script type="module">
 ```
 
+The bindings are the `wasm/` crate (`pbn-to-pdf-wasm`), a separate workspace
+that path-depends on the renderer.
+
 ```js
-import init, { renderPbn, boardCount, layouts, RenderOptions } from "./pkg/pbn_to_pdf.js";
+import init, { renderPbn, boardCount, layouts, RenderOptions } from "./pkg/pbn_to_pdf_wasm.js";
 
 await init();
 
@@ -116,8 +119,8 @@ const url = URL.createObjectURL(new Blob([pdf], { type: "application/pdf" }));
 flags. Errors (an unknown layout, a PBN with no boards) are thrown as JS
 exceptions.
 
-After building for Node, `node tests/wasm/node_smoke_test.mjs` renders every
-layout and checks the resulting PDFs.
+After building for Node, `node wasm/verify.mjs` renders every layout and checks
+the resulting PDFs.
 
 The bundle is large — about 21 MB raw, 8.8 MB gzipped — because the 52 card SVGs
 are compiled in. Serve it compressed, and expect the fetch to dominate the first

@@ -1,0 +1,27 @@
+[package]
+name = "pbn-to-pdf-wasm"
+version = "0.17.1"
+edition = "2021"
+license = "Unlicense"
+description = "WebAssembly bindings for pbn-to-pdf: render PBN files to PDF in the browser"
+publish = false
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+# The renderer. Path dep: these bindings must always build against the adjacent
+# source, never a published or pinned copy, so the engine and the site version
+# together. `cli` is off -- clap and env_logger are dead weight in a bundle.
+pbn-to-pdf = { path = "..", default-features = false }
+
+wasm-bindgen = "0.2"
+# Panics reach console.error with a message and a stack, instead of the bare
+# "unreachable executed" a wasm trap otherwise surfaces.
+console_error_panic_hook = "0.1"
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+# printpdf and lopdf pull getrandom, which has no entropy source on
+# wasm32-unknown-unknown. The wasm_js backend points it at crypto.getRandomValues;
+# it also needs --cfg getrandom_backend="wasm_js", which build.sh sets.
+getrandom = { version = "0.3", features = ["wasm_js"] }

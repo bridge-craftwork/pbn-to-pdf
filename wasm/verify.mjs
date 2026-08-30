@@ -1,7 +1,7 @@
 // End-to-end check that the wasm build actually renders, not just compiles.
 // Run after ./wasm-build.sh --target nodejs --out-dir pkg-node:
 //
-//   node tests/wasm/node_smoke_test.mjs
+//   node wasm/verify.mjs
 //
 // Rendering exercises the whole stack in wasm: the nom parser, rustybuzz text
 // shaping, the embedded fonts, svg2pdf on the card art, and lopdf compression
@@ -11,9 +11,10 @@ import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 
-const root = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
+const here = dirname(fileURLToPath(import.meta.url));
+const root = join(here, "..");
 const { renderPbn, boardCount, layouts, RenderOptions } = await import(
-  join(root, "pkg-node", "pbn_to_pdf.js")
+  join(here, "pkg-node", "pbn_to_pdf_wasm.js")
 );
 
 const outDir = join(root, "tests", "output");

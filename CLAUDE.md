@@ -45,7 +45,12 @@ cargo fmt
 
 ## WebAssembly
 
-`./wasm-build.sh` builds the wasm package via `wasm-pack`. It exists because two
+The bindings live in their own crate, `wasm/` (`pbn-to-pdf-wasm`), which
+path-depends on the renderer with `default-features = false`. It is a **separate
+workspace**: `cargo test --workspace` at the root does not reach it, which is why
+CI has a dedicated `WebAssembly` job.
+
+`./wasm-build.sh` builds the package via `wasm-pack`. It exists because two
 things are easy to get wrong and silent when you do:
 
 - **`--cfg getrandom_backend="wasm_js"`.** `printpdf` and `lopdf` depend on
@@ -55,20 +60,27 @@ things are easy to get wrong and silent when you do:
   0.3 also needs this cfg before it uses that backend. Without it the build
   succeeds and fails at runtime on the first render. It lives in the script
   rather than `.cargo/config.toml` because that file is gitignored.
-- **`--no-default-features --features wasm`.** The default `cli` feature pulls
-  clap and env_logger, which are dead weight in a wasm bundle.
+- **Lockfile protection for a second workspace.** `wasm/` has its own
+  `Cargo.lock`, and cargo config discovery walks *upward* — so it inherits the
+  root `.cargo/config.toml` `[patch]` overrides and its lock is exposed to
+  exactly the same silent rewrite the root one is. `./dev-build.sh --workspace
+  wasm` protects it; `wasm-build.sh` goes through that. A dev build of `wasm/`
+  without it commits a lock whose `bridge-types` entry has lost its `source =`
+  line, which CI cannot resolve.
 
-The script calls `wasm-pack` through `./dev-build.sh --exec`, so it gets the same
-`Cargo.lock` protection as any other cargo invocation here — `--exec` runs an
-arbitrary cargo-invoking command inside the lockfile swap.
+`dev-build.sh` grew two flags for this: `--exec` runs an arbitrary
+cargo-invoking command inside the lockfile swap, and `--workspace <dir>` selects
+which crate's lock is protected and runs the command there. It also warns when
+the target lock is untracked, because that is the one case it cannot protect —
+the first build of a new workspace writes a patched lock that looks ordinary.
 
 ### Feature layout
 
 - `cli` (default) — clap and env_logger. Both binaries declare
   `required-features = ["cli"]`. `Settings::from_args` and the `Args` struct are
   gated on it; the shared enums (`Layout`, `PageSize`, ...) are always compiled
-  and only their `ValueEnum` derive is conditional.
-- `wasm` — `src/wasm.rs`, a thin wasm-bindgen wrapper over `render_boards`.
+  and only their `ValueEnum` derive is conditional. The `wasm/` crate depends on
+  this one with `default-features = false`, so it gets neither.
 
 `Layout::as_str`/`FromStr` give non-clap consumers the same layout spellings the
 CLI accepts; a test asserts they match clap's `ValueEnum` names so they can't
@@ -76,7 +88,7 @@ drift apart.
 
 ### Verifying a wasm build
 
-`./wasm-build.sh --target nodejs --out-dir pkg-node && node tests/wasm/node_smoke_test.mjs`
+`./wasm-build.sh --target nodejs --out-dir pkg-node && node wasm/verify.mjs`
 renders every layout and validates the PDFs. Compiling is not sufficient
 evidence that a wasm build works — the getrandom trap above and the SVG font
 issue below both compile cleanly and fail (or silently degrade) only at runtime.

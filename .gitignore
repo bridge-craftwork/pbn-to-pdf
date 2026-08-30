@@ -16,6 +16,6 @@
 activity-log.json
 __pycache__/
 
-# wasm-pack output
+# wasm-pack output (see also wasm/.gitignore)
 /pkg/
 /pkg-node/
