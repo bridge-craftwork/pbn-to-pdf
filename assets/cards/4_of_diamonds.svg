@@ -241,18 +241,7 @@
 
 
 
-<text
-   xml:space="preserve"
-   style="font-size:32px;font-style:normal;font-weight:normal;line-height:125%;letter-spacing:0px;word-spacing:0px;fill:#df0000;fill-opacity:1;stroke:none;font-family:Bitstream Vera Sans"
-   x="0.56581068"
-   y="26.413288"
-   id="text3788"
-   sodipodi:linespacing="125%"><tspan
-     sodipodi:role="line"
-     id="tspan3790"
-     x="0.56581068"
-     y="26.413288"
-     style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;fill:#df0000;fill-opacity:1;font-family:Arial;-inkscape-font-specification:Arial">4</tspan></text>
+<path d="M14.33 21.43V26.41H11.68V21.43H1.3V19.24L11.38 4.4H14.33V19.21H17.43V21.43ZM3.89 19.21H11.68V10.43Q11.68 9.71 11.68 9Q11.69 8.29 11.74 7.57Q11.38 8.26 11.11 8.69Q10.85 9.12 10.63 9.43Z" style="fill:#df0000;fill-opacity:1;stroke:none" id="text3788" class="rank-index" />
 
 
 
@@ -260,19 +249,7 @@
 
 
 
-<text
-   xml:space="preserve"
-   style="font-size:32px;font-style:normal;font-weight:normal;line-height:125%;letter-spacing:0px;word-spacing:0px;fill:#df0000;fill-opacity:1;stroke:none;font-family:Bitstream Vera Sans"
-   x="-159.48785"
-   y="-216.71518"
-   id="text3788-4"
-   sodipodi:linespacing="125%"
-   transform="scale(-1,-1)"><tspan
-     sodipodi:role="line"
-     id="tspan3790-3"
-     x="-159.48785"
-     y="-216.71518"
-     style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;fill:#df0000;fill-opacity:1;font-family:Arial;-inkscape-font-specification:Arial">4</tspan></text>
+<path d="M145.72 221.7V216.72H148.38V221.7H158.75V223.89L148.68 238.73H145.72V223.92H142.63V221.7ZM156.16 223.92H148.38V232.7Q148.38 233.42 148.37 234.13Q148.36 234.84 148.32 235.56Q148.68 234.87 148.94 234.44Q149.21 234.01 149.43 233.7Z" style="fill:#df0000;fill-opacity:1;stroke:none" id="text3788-4" class="rank-index mirror" />
 
 
 

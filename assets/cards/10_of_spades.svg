@@ -87,18 +87,7 @@
 			
 		</g>
 	</g>
-<text
-   xml:space="preserve"
-   style="font-size:32px;font-style:normal;font-weight:normal;line-height:125%;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none;font-family:Bitstream Vera Sans"
-   x="-3.0"
-   y="28.342009"
-   id="text3788"
-   sodipodi:linespacing="125%"><tspan
-     sodipodi:role="line"
-     id="tspan3790"
-     x="-3.0"
-     y="28.342009"
-     style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-family:Arial;-inkscape-font-specification:Arial">1</tspan></text>
+<path d="M13.23 25.95V28.34H-0.56V25.95H5.05V9.01L0.08 12.56V9.9L5.28 6.33H7.88V25.95Z" style="fill:#000000;fill-opacity:1;stroke:none" id="text3788" class="rank-index" />
 
 
 
@@ -191,40 +180,7 @@
      d="M 7.989,3.103 C 7.747,-0.954 0.242,-8.59 0,-10.5 c -0.242,1.909 -7.747,9.545 -7.989,13.603 -0.169,2.868 1.695,4.057 3.39,4.057 1.8351685,-0.021581 3.3508701,-2.8006944 3.873,-3.341 0.242,0.716 -1.603,6.682 -2.179,6.682 l 5.811,0 C 2.33,10.501 0.485,4.535 0.727,3.819 1.1841472,4.3152961 2.5241276,7.0768295 4.601,7.16 6.295,7.159 8.158,5.971 7.989,3.103 z"
      inkscape:connector-curvature="0"
      style="fill:#000000"
-     sodipodi:nodetypes="cccccccccc" /></g><text
-   xml:space="preserve"
-   style="font-size:32px;font-style:normal;font-weight:normal;line-height:125%;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none;font-family:Bitstream Vera Sans"
-   x="9.5"
-   y="28.670717"
-   id="text3038"
-   sodipodi:linespacing="125%"><tspan
-     sodipodi:role="line"
-     id="tspan3040"
-     x="9.5"
-     y="28.670717">0</tspan></text>
-<text
-   xml:space="preserve"
-   style="font-size:32px;font-style:normal;font-weight:normal;line-height:125%;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none;font-family:Bitstream Vera Sans"
-   x="-170.0"
-   y="-214.58258"
-   id="text3788-4"
-   sodipodi:linespacing="125%"
-   transform="scale(-1,-1)"><tspan
-     sodipodi:role="line"
-     id="tspan3790-3"
-     x="-170.0"
-     y="-214.58258"
-     style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-family:Arial;-inkscape-font-specification:Arial">1</tspan></text>
-<text
-   xml:space="preserve"
-   style="font-size:32px;font-style:normal;font-weight:normal;line-height:125%;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none;font-family:Bitstream Vera Sans"
-   x="-157.5"
-   y="-214.25388"
-   id="text3038-1"
-   sodipodi:linespacing="125%"
-   transform="scale(-1,-1)"><tspan
-     sodipodi:role="line"
-     id="tspan3040-4"
-     x="-157.5"
-     y="-214.25388">0</tspan></text>
+     sodipodi:nodetypes="cccccccccc" /></g><path d="M26.05 17.66Q26.05 23.17 24.1 26.08Q22.16 28.98 18.36 28.98Q14.56 28.98 12.66 26.09Q10.75 23.2 10.75 17.66Q10.75 11.98 12.6 9.16Q14.45 6.33 18.45 6.33Q22.34 6.33 24.2 9.19Q26.05 12.05 26.05 17.66ZM23.19 17.66Q23.19 14.47 22.71 12.48Q22.23 10.48 21.19 9.55Q20.14 8.61 18.45 8.61Q16.73 8.61 15.66 9.53Q14.58 10.45 14.09 12.44Q13.59 14.44 13.59 17.66Q13.59 20.78 14.1 22.78Q14.61 24.78 15.67 25.73Q16.73 26.69 18.39 26.69Q20.88 26.69 22.03 24.47Q23.19 22.25 23.19 17.66Z" style="fill:#000000;fill-opacity:1;stroke:none" id="text3038" class="rank-index" />
+<path d="M153.77 216.97V214.58H167.56V216.97H161.95V233.91L166.92 230.36V233.02L161.72 236.6H159.12V216.97Z" style="fill:#000000;fill-opacity:1;stroke:none" id="text3788-4" class="rank-index mirror" />
+<path d="M140.95 225.27Q140.95 219.75 142.9 216.85Q144.84 213.94 148.64 213.94Q152.44 213.94 154.34 216.83Q156.25 219.72 156.25 225.27Q156.25 230.94 154.4 233.77Q152.55 236.6 148.55 236.6Q144.66 236.6 142.8 233.74Q140.95 230.88 140.95 225.27ZM143.81 225.27Q143.81 228.46 144.29 230.45Q144.77 232.44 145.81 233.38Q146.86 234.32 148.55 234.32Q150.27 234.32 151.34 233.39Q152.42 232.47 152.91 230.48Q153.41 228.49 153.41 225.27Q153.41 222.14 152.9 220.14Q152.39 218.14 151.33 217.19Q150.27 216.24 148.61 216.24Q146.12 216.24 144.97 218.46Q143.81 220.68 143.81 225.27Z" style="fill:#000000;fill-opacity:1;stroke:none" id="text3038-1" class="rank-index mirror" />
 </svg>

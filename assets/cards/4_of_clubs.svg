@@ -156,18 +156,7 @@
 			
 		</g>
 	</g>
-<text
-   xml:space="preserve"
-   style="font-size:32px;font-style:normal;font-weight:normal;line-height:125%;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none;font-family:Bitstream Vera Sans"
-   x="0.45905292"
-   y="27.548409"
-   id="text3788"
-   sodipodi:linespacing="125%"><tspan
-     sodipodi:role="line"
-     id="tspan3790"
-     x="0.45905292"
-     y="27.548409"
-     style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-family:Arial;-inkscape-font-specification:Arial">4</tspan></text>
+<path d="M14.22 22.56V27.55H11.57V22.56H1.19V20.38L11.27 5.53H14.22V20.35H17.32V22.56ZM3.79 20.35H11.57V11.56Q11.57 10.85 11.58 10.13Q11.58 9.42 11.63 8.7Q11.27 9.39 11.01 9.82Q10.74 10.25 10.52 10.56Z" style="fill:#000000;fill-opacity:1;stroke:none" id="text3788" class="rank-index" />
 
 
 
@@ -180,19 +169,7 @@
      id="cl-9"
      d="m 50.291466,22.698228 c 0,0 2.375,-1.9 2.375,-4.534 0,-1.542 -1.369,-4.102 -4.534,-4.102 -3.165,0 -4.534,2.561 -4.534,4.102 0,2.634 2.375,4.534 2.375,4.534 -2.638,-2.055 -7.341,-0.652 -7.341,3.455 0,2.056 1.68,4.318 4.318,4.318 3.165,0 4.534,-3.455 4.534,-3.455 0,0 0.402,3.938 -1.943,6.046 h 5.182 c -2.345,-2.107 -1.943,-6.046 -1.943,-6.046 0,0 1.369,3.455 4.534,3.455 2.639,0 4.318,-2.263 4.318,-4.318 0,-4.107 -4.703,-5.51 -7.341,-3.455 z"
      inkscape:connector-curvature="0"
-     style="fill:#000000" /></g><text
-   xml:space="preserve"
-   style="font-size:32px;font-style:normal;font-weight:normal;line-height:125%;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none;font-family:Bitstream Vera Sans"
-   x="-158.86395"
-   y="-214.4666"
-   id="text3788-8"
-   sodipodi:linespacing="125%"
-   transform="scale(-1,-1)"><tspan
-     sodipodi:role="line"
-     id="tspan3790-7"
-     x="-158.86395"
-     y="-214.4666"
-     style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-family:Arial;-inkscape-font-specification:Arial">4</tspan></text>
+     style="fill:#000000" /></g><path d="M145.1 219.45V214.47H147.75V219.45H158.13V221.64L148.05 236.48H145.1V221.67H142V219.45ZM155.54 221.67H147.75V230.45Q147.75 231.17 147.75 231.88Q147.74 232.59 147.69 233.31Q148.05 232.62 148.32 232.19Q148.58 231.76 148.8 231.45Z" style="fill:#000000;fill-opacity:1;stroke:none" id="text3788-8" class="rank-index mirror" />
 
 
 

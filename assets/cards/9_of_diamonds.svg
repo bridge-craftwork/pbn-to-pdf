@@ -241,18 +241,7 @@
 
 
 
-<text
-   xml:space="preserve"
-   style="font-size:32px;font-style:normal;font-weight:normal;line-height:125%;letter-spacing:0px;word-spacing:0px;fill:#df0000;fill-opacity:1;stroke:none;font-family:Bitstream Vera Sans"
-   x="0.56581068"
-   y="26.413288"
-   id="text3788"
-   sodipodi:linespacing="125%"><tspan
-     sodipodi:role="line"
-     id="tspan3790"
-     x="0.56581068"
-     y="26.413288"
-     style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;fill:#df0000;fill-opacity:1;font-family:Arial;-inkscape-font-specification:Arial">9</tspan></text>
+<path d="M16.85 14.96Q16.85 20.63 14.78 23.68Q12.71 26.73 8.88 26.73Q6.3 26.73 4.75 25.64Q3.19 24.55 2.52 22.13L5.21 21.71Q6.05 24.46 8.93 24.46Q11.35 24.46 12.68 22.21Q14 19.96 14.07 15.79Q13.44 17.19 11.93 18.05Q10.41 18.9 8.6 18.9Q6.63 18.9 5.16 17.98Q3.69 17.05 2.88 15.38Q2.07 13.71 2.07 11.48Q2.07 8.02 4 6.05Q5.94 4.07 9.39 4.07Q13.07 4.07 14.96 6.79Q16.85 9.51 16.85 14.96ZM13.78 12.24Q13.78 9.59 12.57 7.97Q11.35 6.35 9.3 6.35Q7.27 6.35 6.1 7.73Q4.93 9.12 4.93 11.48Q4.93 13.88 6.1 15.28Q7.27 16.68 9.27 16.68Q10.49 16.68 11.51 16.12Q12.53 15.55 13.16 14.55Q13.78 13.54 13.78 12.24Z" style="fill:#df0000;fill-opacity:1;stroke:none" id="text3788" class="rank-index" />
 
 
 
@@ -264,19 +253,7 @@
 
 
 
-<text
-   xml:space="preserve"
-   style="font-size:32px;font-style:normal;font-weight:normal;line-height:125%;letter-spacing:0px;word-spacing:0px;fill:#df0000;fill-opacity:1;stroke:none;font-family:Bitstream Vera Sans"
-   x="-159.48785"
-   y="-216.71518"
-   id="text3788-4"
-   sodipodi:linespacing="125%"
-   transform="scale(-1,-1)"><tspan
-     sodipodi:role="line"
-     id="tspan3790-3"
-     x="-159.48785"
-     y="-216.71518"
-     style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;fill:#df0000;fill-opacity:1;font-family:Arial;-inkscape-font-specification:Arial">9</tspan></text>
+<path d="M143.21 228.17Q143.21 222.5 145.28 219.45Q147.35 216.4 151.18 216.4Q153.75 216.4 155.31 217.49Q156.86 218.57 157.53 221L154.85 221.42Q154 218.67 151.13 218.67Q148.71 218.67 147.38 220.92Q146.05 223.17 145.99 227.34Q146.61 225.93 148.13 225.08Q149.64 224.23 151.46 224.23Q153.43 224.23 154.89 225.15Q156.36 226.07 157.18 227.75Q157.99 229.42 157.99 231.65Q157.99 235.11 156.05 237.08Q154.11 239.06 150.66 239.06Q146.99 239.06 145.1 236.34Q143.21 233.62 143.21 228.17ZM146.27 230.89Q146.27 233.54 147.49 235.16Q148.71 236.78 150.75 236.78Q152.78 236.78 153.96 235.39Q155.13 234.01 155.13 231.65Q155.13 229.25 153.96 227.85Q152.78 226.45 150.78 226.45Q149.57 226.45 148.54 227.01Q147.52 227.57 146.89 228.58Q146.27 229.59 146.27 230.89Z" style="fill:#df0000;fill-opacity:1;stroke:none" id="text3788-4" class="rank-index mirror" />
 
 
 

@@ -218,18 +218,7 @@
 
 
 
-<text
-   xml:space="preserve"
-   style="font-size:28.75612259px;font-style:normal;font-weight:normal;line-height:125%;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none;font-family:Bitstream Vera Sans"
-   x="0.43506649"
-   y="24.335196"
-   id="text3788"
-   sodipodi:linespacing="125%"><tspan
-     sodipodi:role="line"
-     id="tspan3790"
-     x="0.43506649"
-     y="24.335196"
-     style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-family:Arial;-inkscape-font-specification:Arial">Q</tspan></text>
+<path d="M21.43 14.35Q21.43 17.13 20.48 19.28Q19.53 21.43 17.75 22.76Q15.96 24.08 13.47 24.42Q14.04 26.19 14.97 26.97Q15.91 27.76 17.34 27.76Q18.14 27.76 18.96 27.58V29.46Q17.68 29.77 16.46 29.77Q14.34 29.77 12.97 28.57Q11.6 27.37 10.73 24.56Q7.89 24.42 5.9 23.13Q3.9 21.84 2.85 19.59Q1.8 17.34 1.8 14.35Q1.8 11.18 2.97 8.93Q4.14 6.67 6.34 5.46Q8.54 4.26 11.63 4.26Q14.74 4.26 16.93 5.49Q19.12 6.71 20.28 8.97Q21.43 11.23 21.43 14.35ZM18.69 14.35Q18.69 10.66 16.84 8.55Q15 6.45 11.63 6.45Q8.23 6.45 6.37 8.52Q4.52 10.6 4.52 14.35Q4.52 16.82 5.36 18.64Q6.21 20.46 7.79 21.45Q9.38 22.44 11.6 22.44Q15.02 22.44 16.86 20.33Q18.69 18.21 18.69 14.35Z" style="fill:#000000;fill-opacity:1;stroke:none" id="text3788" class="rank-index" />
 
 
 
@@ -292,19 +281,7 @@
      style="fill:none;stroke:none"
      id="g31-0"><g
        id="g33-6"
-       style="fill:none" /></g></g><text
-   xml:space="preserve"
-   style="font-size:28.75612259px;font-style:normal;font-weight:normal;line-height:125%;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none;font-family:Bitstream Vera Sans"
-   x="-166.87682"
-   y="-218.07912"
-   id="text3788-8"
-   sodipodi:linespacing="125%"
-   transform="scale(-1,-1)"><tspan
-     sodipodi:role="line"
-     id="tspan3790-8"
-     x="-166.87682"
-     y="-218.07912"
-     style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-family:Arial;-inkscape-font-specification:Arial">Q</tspan></text>
+       style="fill:none" /></g></g><path d="M145.89 228.06Q145.89 225.28 146.83 223.13Q147.78 220.99 149.56 219.66Q151.35 218.33 153.85 217.99Q153.27 216.23 152.34 215.44Q151.4 214.65 149.97 214.65Q149.17 214.65 148.36 214.84V212.95Q149.63 212.65 150.86 212.65Q152.98 212.65 154.35 213.85Q155.71 215.05 156.58 217.85Q159.42 217.99 161.41 219.29Q163.41 220.58 164.46 222.83Q165.51 225.07 165.51 228.06Q165.51 231.24 164.34 233.49Q163.17 235.74 160.97 236.95Q158.78 238.16 155.69 238.16Q152.57 238.16 150.38 236.93Q148.19 235.7 147.04 233.44Q145.89 231.18 145.89 228.06ZM148.62 228.06Q148.62 231.76 150.47 233.86Q152.32 235.97 155.69 235.97Q159.08 235.97 160.94 233.89Q162.79 231.81 162.79 228.06Q162.79 225.59 161.95 223.77Q161.11 221.95 159.52 220.96Q157.93 219.97 155.71 219.97Q152.29 219.97 150.46 222.09Q148.62 224.2 148.62 228.06Z" style="fill:#000000;fill-opacity:1;stroke:none" id="text3788-8" class="rank-index mirror" />
 
 
 <g

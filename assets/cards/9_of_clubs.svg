@@ -156,18 +156,7 @@
 			
 		</g>
 	</g>
-<text
-   xml:space="preserve"
-   style="font-size:32px;font-style:normal;font-weight:normal;line-height:125%;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none;font-family:Bitstream Vera Sans"
-   x="0.45905292"
-   y="27.548409"
-   id="text3788"
-   sodipodi:linespacing="125%"><tspan
-     sodipodi:role="line"
-     id="tspan3790"
-     x="0.45905292"
-     y="27.548409"
-     style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-family:Arial;-inkscape-font-specification:Arial">9</tspan></text>
+<path d="M16.74 16.1Q16.74 21.77 14.67 24.81Q12.6 27.86 8.77 27.86Q6.19 27.86 4.64 26.77Q3.08 25.69 2.41 23.27L5.1 22.85Q5.94 25.6 8.82 25.6Q11.24 25.6 12.57 23.35Q13.9 21.1 13.96 16.92Q13.33 18.33 11.82 19.18Q10.3 20.03 8.49 20.03Q6.52 20.03 5.05 19.11Q3.58 18.19 2.77 16.52Q1.96 14.85 1.96 12.61Q1.96 9.16 3.9 7.18Q5.83 5.2 9.29 5.2Q12.96 5.2 14.85 7.92Q16.74 10.64 16.74 16.1ZM13.68 13.38Q13.68 10.72 12.46 9.1Q11.24 7.49 9.19 7.49Q7.16 7.49 5.99 8.87Q4.82 10.25 4.82 12.61Q4.82 15.02 5.99 16.42Q7.16 17.81 9.16 17.81Q10.38 17.81 11.4 17.25Q12.43 16.69 13.05 15.68Q13.68 14.67 13.68 13.38Z" style="fill:#000000;fill-opacity:1;stroke:none" id="text3788" class="rank-index" />
 
 
 
@@ -186,19 +175,7 @@
      id="cl-9"
      d="m 50.291466,22.698228 c 0,0 2.375,-1.9 2.375,-4.534 0,-1.542 -1.369,-4.102 -4.534,-4.102 -3.165,0 -4.534,2.561 -4.534,4.102 0,2.634 2.375,4.534 2.375,4.534 -2.638,-2.055 -7.341,-0.652 -7.341,3.455 0,2.056 1.68,4.318 4.318,4.318 3.165,0 4.534,-3.455 4.534,-3.455 0,0 0.402,3.938 -1.943,6.046 h 5.182 c -2.345,-2.107 -1.943,-6.046 -1.943,-6.046 0,0 1.369,3.455 4.534,3.455 2.639,0 4.318,-2.263 4.318,-4.318 0,-4.107 -4.703,-5.51 -7.341,-3.455 z"
      inkscape:connector-curvature="0"
-     style="fill:#000000" /></g><text
-   xml:space="preserve"
-   style="font-size:32px;font-style:normal;font-weight:normal;line-height:125%;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none;font-family:Bitstream Vera Sans"
-   x="-158.86395"
-   y="-214.4666"
-   id="text3788-8"
-   sodipodi:linespacing="125%"
-   transform="scale(-1,-1)"><tspan
-     sodipodi:role="line"
-     id="tspan3790-7"
-     x="-158.86395"
-     y="-214.4666"
-     style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-family:Arial;-inkscape-font-specification:Arial">9</tspan></text>
+     style="fill:#000000" /></g><path d="M142.58 225.92Q142.58 220.25 144.65 217.2Q146.72 214.15 150.55 214.15Q153.13 214.15 154.68 215.24Q156.24 216.33 156.91 218.75L154.22 219.17Q153.38 216.42 150.5 216.42Q148.08 216.42 146.75 218.67Q145.43 220.92 145.36 225.09Q145.99 223.69 147.5 222.83Q149.02 221.98 150.83 221.98Q152.8 221.98 154.27 222.9Q155.74 223.83 156.55 225.5Q157.36 227.17 157.36 229.4Q157.36 232.86 155.43 234.83Q153.49 236.81 150.04 236.81Q146.36 236.81 144.47 234.09Q142.58 231.37 142.58 225.92ZM145.65 228.64Q145.65 231.29 146.86 232.91Q148.08 234.53 150.13 234.53Q152.16 234.53 153.33 233.15Q154.5 231.76 154.5 229.4Q154.5 227 153.33 225.6Q152.16 224.2 150.16 224.2Q148.94 224.2 147.92 224.76Q146.9 225.33 146.27 226.33Q145.65 227.34 145.65 228.64Z" style="fill:#000000;fill-opacity:1;stroke:none" id="text3788-8" class="rank-index mirror" />
 
 
 

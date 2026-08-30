@@ -305,6 +305,13 @@ def classify(root):
         tag = el.tag.replace(SVG, '')
         if tag in ('metadata', 'defs') or 'namedview' in el.tag:
             continue
+        # The rank indices are ordinary <path>s since tools/svg_text_to_paths.py
+        # baked them, so they announce themselves by class -- checked before the
+        # geometric tests below, which would otherwise file them under 'pips'.
+        cls = (el.get('class') or '').split()
+        if 'rank-index' in cls:
+            roles['text_mirror' if 'mirror' in cls else 'text_index'] = el
+            continue
         paths = list(el.iter(SVG + 'path')) if el.tag != SVG + 'path' else [el]
         dbytes = sum(len(p.get('d', '')) for p in paths)
         styles = ' '.join((p.get('style') or '') for p in paths)
@@ -443,6 +450,30 @@ def _reemit(sub):
     return ''.join(parts)
 
 
+# The upstream assets name their source in a comment above the root element.
+# ElementTree drops comments when parsing, so it is lifted from the raw text and
+# written back -- these variants are redistributed too, and the attribution
+# should travel with them (see THIRD-PARTY-NOTICES.md).
+SOURCE_COMMENT = re.compile(r'<!--.*?-->', re.S)
+
+
+def source_comment(path):
+    """The provenance comment preceding <svg>, or None."""
+    head = open(path, encoding='utf-8').read(2048)
+    before_root = head.split('<svg', 1)[0]
+    m = SOURCE_COMMENT.search(before_root)
+    return m.group(0) if m else None
+
+
+def write_svg(tree, path, comment):
+    tree.write(path, encoding='utf-8', xml_declaration=True)
+    if not comment:
+        return
+    text = open(path, encoding='utf-8').read()
+    decl, nl, rest = text.partition('\n')
+    open(path, 'w', encoding='utf-8').write(decl + nl + comment + '\n' + rest)
+
+
 def main():
     here = os.path.dirname(os.path.abspath(__file__))
     cards = os.path.join(here, '..', 'assets', 'cards')
@@ -461,8 +492,9 @@ def main():
             corner = ET.ElementTree(build_corner(ET.parse(src).getroot(), name))
             bp = os.path.join(outdir, name + '_band.svg')
             cpth = os.path.join(outdir, name + '_corner.svg')
-            band.write(bp, encoding='utf-8', xml_declaration=True)
-            corner.write(cpth, encoding='utf-8', xml_declaration=True)
+            provenance = source_comment(src)
+            write_svg(band, bp, provenance)
+            write_svg(corner, cpth, provenance)
 
             s, b, c = (os.path.getsize(src), os.path.getsize(bp), os.path.getsize(cpth))
             total_src += s; total_band += b; total_corner += c

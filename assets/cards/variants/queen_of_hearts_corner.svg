@@ -1,5 +1,6 @@
 <?xml version='1.0' encoding='utf-8'?>
-<svg xmlns="http://www.w3.org/2000/svg" xmlns:ns1="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd" xmlns:ns2="http://www.inkscape.org/namespaces/inkscape" width="167.0869141pt" height="242.6669922pt" viewBox="0 0 167.0869141 242.6669922" version="1.1"><g id="Layer_x0020_1" style="fill-rule:nonzero;clip-rule:nonzero;stroke:#C0C0C0;stroke-miterlimit:4;">
+<!-- http://code.google.com/p/vector-playing-cards/ -->
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:ns1="http://www.inkscape.org/namespaces/inkscape" xmlns:ns2="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd" width="167.0869141pt" height="242.6669922pt" viewBox="0 0 167.0869141 242.6669922" version="1.1"><g id="Layer_x0020_1" style="fill-rule:nonzero;clip-rule:nonzero;stroke:#C0C0C0;stroke-miterlimit:4;">
 		<path style="fill:#FFFFFF;stroke-width:1.5;" d="M166.8369141,235.5478516c0,3.7773438-3.0869141,6.8691406-6.8710938,6.8691406H7.1108398c-3.7749023,0-6.8608398-3.0917969-6.8608398-6.8691406V7.1201172C0.25,3.3427734,3.3359375,0.25,7.1108398,0.25h152.8549805    c3.7841797,0,6.8710938,3.0927734,6.8710938,6.8701172v228.4277344z" id="path5" />
 		<g style="stroke:none;" id="g7">
 			<g id="g9">
@@ -29,7 +30,7 @@
 
 
 
-<text xml:space="preserve" style="font-size:28.70453262px;font-style:normal;font-weight:normal;line-height:125%;letter-spacing:0px;word-spacing:0px;fill:#df0000;fill-opacity:1;stroke:none;font-family:Bitstream Vera Sans" x="0.20024458" y="24.898649" id="text3788" ns1:linespacing="125%"><tspan ns1:role="line" id="tspan3790" x="0.20024458" y="24.898649" style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;fill:#df0000;fill-opacity:1;font-family:Arial;-inkscape-font-specification:Arial">Q</tspan></text>
+<path d="M21.15 14.93Q21.15 17.71 20.21 19.85Q19.26 22 17.48 23.32Q15.7 24.65 13.21 24.98Q13.78 26.75 14.71 27.53Q15.65 28.32 17.08 28.32Q17.87 28.32 18.69 28.14V30.01Q17.41 30.32 16.19 30.32Q14.08 30.32 12.71 29.12Q11.34 27.93 10.47 25.12Q7.64 24.98 5.65 23.69Q3.66 22.4 2.61 20.16Q1.56 17.92 1.56 14.93Q1.56 11.77 2.73 9.52Q3.9 7.27 6.09 6.06Q8.29 4.86 11.37 4.86Q14.48 4.86 16.67 6.08Q18.86 7.31 20 9.57Q21.15 11.82 21.15 14.93ZM18.42 14.93Q18.42 11.25 16.58 9.14Q14.73 7.04 11.37 7.04Q7.98 7.04 6.13 9.12Q4.28 11.19 4.28 14.93Q4.28 17.4 5.12 19.22Q5.96 21.03 7.54 22.02Q9.13 23.01 11.34 23.01Q14.76 23.01 16.59 20.9Q18.42 18.79 18.42 14.93Z" style="fill:#df0000;fill-opacity:1;stroke:none" id="text3788" class="rank-index" />
 
 
 
@@ -40,5 +41,5 @@
 
 
 
-<g transform="matrix(1.1121828,0,0,1.0408972,11.308902,37.479724)" id="layer1-9-6-9" style="fill:#df0000;fill-opacity:1"><path style="fill:#df0000;fill-opacity:1" ns2:connector-curvature="0" id="hl-8-17" d="M 3.676,-9 C 0.433,-9 0,-5.523 0,-5.523 0,-5.523 -0.433,-9 -3.676,-9 -5.946,-9 -8,-7.441 -8,-4.5 -8,-0.614 -1.4208493,3.2938141 0,9 1.35201,3.2985969 8,-0.614 8,-4.5 8,-7.441 5.946,-9 3.676,-9 z" ns1:nodetypes="scsscss" /></g>
+<g transform="matrix(1.1121828,0,0,1.0408972,11.308902,37.479724)" id="layer1-9-6-9" style="fill:#df0000;fill-opacity:1"><path style="fill:#df0000;fill-opacity:1" ns1:connector-curvature="0" id="hl-8-17" d="M 3.676,-9 C 0.433,-9 0,-5.523 0,-5.523 0,-5.523 -0.433,-9 -3.676,-9 -5.946,-9 -8,-7.441 -8,-4.5 -8,-0.614 -1.4208493,3.2938141 0,9 1.35201,3.2985969 8,-0.614 8,-4.5 8,-7.441 5.946,-9 3.676,-9 z" ns2:nodetypes="scsscss" /></g>
 </svg>

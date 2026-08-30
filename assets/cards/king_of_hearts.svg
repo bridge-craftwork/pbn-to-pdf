@@ -207,18 +207,7 @@
 
 
 
-<text
-   xml:space="preserve"
-   style="font-size:29.22270203px;font-style:normal;font-weight:normal;line-height:125%;letter-spacing:0px;word-spacing:0px;fill:#df0000;fill-opacity:1;stroke:none;font-family:Bitstream Vera Sans"
-   x="0.91949666"
-   y="25.968842"
-   id="text3788"
-   sodipodi:linespacing="125%"><tspan
-     sodipodi:role="line"
-     id="tspan3790"
-     x="0.91949666"
-     y="25.968842"
-     style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;fill:#df0000;fill-opacity:1;font-family:Arial;-inkscape-font-specification:Arial">K</tspan></text>
+<path d="M6.04 18.26V25.97H3.32V5.86H6.04V15.94L15.73 5.86H18.94L10.38 14.6L20.08 25.97H16.7L8.67 16.27Z" style="fill:#df0000;fill-opacity:1;stroke:none" id="text3788" class="rank-index" />
 
 
 
@@ -302,19 +291,7 @@
      style="fill:none;stroke:none"
      id="g31-0"><g
        id="g33-6"
-       style="fill:none" /></g></g><text
-   xml:space="preserve"
-   style="font-size:29.22270203px;font-style:normal;font-weight:normal;line-height:125%;letter-spacing:0px;word-spacing:0px;fill:#df0000;fill-opacity:1;stroke:none;font-family:Bitstream Vera Sans"
-   x="-166.47145"
-   y="-216.42101"
-   id="text3788-2"
-   sodipodi:linespacing="125%"
-   transform="scale(-1,-1)"><tspan
-     sodipodi:role="line"
-     id="tspan3790-6"
-     x="-166.47145"
-     y="-216.42101"
-     style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;fill:#df0000;fill-opacity:1;font-family:Arial;-inkscape-font-specification:Arial">K</tspan></text>
+       style="fill:none" /></g></g><path d="M161.35 224.13V216.42H164.07V236.53H161.35V226.45L151.66 236.53H148.45L157.01 227.79L147.31 216.42H150.69L158.72 226.12Z" style="fill:#df0000;fill-opacity:1;stroke:none" id="text3788-2" class="rank-index mirror" />
 
 
 
