@@ -1,0 +1,19 @@
+// Cloudflare Pages configuration.
+//
+// The site is a static build: the renderer runs in the visitor's browser as
+// WebAssembly, so there is nothing server-side to deploy and no PBN ever leaves
+// the machine. Everything the deploy needs lives here rather than in dashboard
+// settings, so a hosting change is a reviewable diff.
+//
+// Deploy with `npx wrangler pages deploy` after `npm --prefix web run build:all`.
+//
+// Cloudflare rather than GitHub Pages: builds land in seconds instead of the
+// 5-10 minutes Pages can take, and it carries the .com/.org domains.
+{
+  "name": "pbn-to-pdf",
+  "compatibility_date": "2026-08-30",
+
+  // Vite writes here. `web/public/` is copied in verbatim, which is how
+  // `_headers` reaches the root of the deploy.
+  "pages_build_output_dir": "web/dist"
+}
