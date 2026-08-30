@@ -1,0 +1,75 @@
+/* One place for the palette and the primitives the components share. */
+:root {
+  --bg: #f6f5f2;
+  --panel: #fff;
+  --ink: #1b1b1a;
+  --muted: #5f5f5c;
+  --line: #d9d7d1;
+  --accent: #1f6f4a;
+  --accent-ink: #fff;
+  --danger: #a12b1e;
+  --radius: 8px;
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #17181a;
+    --panel: #1f2124;
+    --ink: #ecebe8;
+    --muted: #a0a09c;
+    --line: #34373b;
+    --accent: #3fa576;
+    --accent-ink: #0c1a13;
+    --danger: #e8776a;
+    color-scheme: dark;
+  }
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font: 15px/1.5 system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+}
+
+button {
+  font: inherit;
+  cursor: pointer;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  color: var(--ink);
+  border-radius: var(--radius);
+  padding: 0.5rem 0.9rem;
+}
+button:hover:not(:disabled) { border-color: var(--muted); }
+button:disabled { opacity: 0.5; cursor: default; }
+
+button.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-ink);
+  font-weight: 600;
+}
+
+select, input[type='url'], input[type='text'] {
+  font: inherit;
+  color: var(--ink);
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 0.45rem 0.55rem;
+  width: 100%;
+}
+
+label { display: block; font-weight: 600; margin-bottom: 0.35rem; }
+.muted { color: var(--muted); }
+.error {
+  color: var(--danger);
+  border: 1px solid currentColor;
+  border-radius: var(--radius);
+  padding: 0.6rem 0.75rem;
+  background: color-mix(in srgb, currentColor 8%, transparent);
+}

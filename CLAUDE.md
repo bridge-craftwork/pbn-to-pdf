@@ -97,6 +97,39 @@ Every layout renders pixel-identical in native and wasm, verified by
 rasterizing both and comparing. That depends on the card rank indices being
 vector paths rather than `<text>` — see below.
 
+## Web app
+
+`web/` is a Vite + Vue 3 front-end over the wasm build, deployed to Cloudflare
+Pages. It follows the layout used by Dealer3 and bridge-solver: `npm run wasm`
+builds the bindings into `web/src/wasm/` (generated, gitignored), and the site
+build consumes them from there — so the wasm must exist on disk before Vite runs.
+
+A few things in `web/vite.config.js` are load-bearing rather than decorative:
+
+- `base: './'` — relative asset URLs, so a build works from a subpath.
+- `optimizeDeps.exclude` on the generated module — `wasm-pack --target web`
+  loads the binary with `new URL('..._bg.wasm', import.meta.url)`, and dep
+  optimisation would rewrite that URL in dev.
+- `manualChunks` puts the engine in its own content-hashed chunk. It is ~21 MB
+  and changes rarely; app code is ~30 kB gzipped. Without the split every
+  app-code deploy re-downloads the engine for everyone.
+
+The engine is imported lazily (`web/src/lib/render.js`), so browsing the lesson
+library and reading the page work while the wasm is still arriving. A failed
+load is deliberately *not* cached, or one flaky network leaves the page
+permanently broken.
+
+Testing has three layers, because each misses what the others catch:
+`npm test` (vitest) covers the pure logic, `node wasm/verify.mjs` covers the
+renderer, and `npm run check:browser` drives the built site in a real Chromium
+to prove they are wired together. The last one is not in CI — it needs a
+browser on disk.
+
+Cloudflare rather than GitHub Pages: builds land in seconds instead of the
+5-10 minutes Pages can take, and it carries the `.com`/`.org` domains. Since it
+is the *only* host, `pages.yml` fails loudly when the credential is missing
+rather than skipping the deploy and going green.
+
 ## Architecture
 
 The codebase follows a layered architecture:

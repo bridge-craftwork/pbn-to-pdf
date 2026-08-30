@@ -90,6 +90,26 @@ pbn-to-pdf hands.pbn -l bidding-sheets -t "My Practice Session"
 pbn-to-pdf hands.pbn -l bidding-sheets -t
 ```
 
+## Web app
+
+There is a browser front-end in [`web/`](web/): choose a PBN — from the
+[Baker Bridge](https://github.com/bridge-craftwork/Baker-Bridge) lesson library,
+a local file, or a URL — pick a layout, and get a PDF. Rendering happens
+entirely in the browser through the WebAssembly build, so nothing is uploaded.
+
+```bash
+cd web
+npm install
+npm run dev          # builds the wasm, then serves with hot reload
+npm run build:all    # wasm + production build into web/dist
+npm test             # unit tests
+npm run check:browser  # end-to-end check against a running preview
+```
+
+Live at **<https://pbn-to-pdf.bridge-classroom.org>**, deployed to Cloudflare
+Pages by `.github/workflows/pages.yml`; the hosting config is
+[`wrangler.jsonc`](wrangler.jsonc).
+
 ## WebAssembly
 
 The renderer also builds for the browser and Node. `render_boards` is a pure

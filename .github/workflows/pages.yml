@@ -1,0 +1,114 @@
+name: Pages
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - 'assets/**'
+      - 'wasm/**'
+      - 'web/**'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      # The hosting half of the deploy: a change to the Pages config or the
+      # headers has to redeploy too, or the site keeps serving the old ones.
+      - 'wrangler.jsonc'
+      - '.github/workflows/pages.yml'
+  # Lets the site be redeployed without a code change.
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Latest wins: a superseded deploy has nothing worth finishing.
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  # Read here rather than inside the step so a step's `if` can test it.
+  CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+  CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: wasm
+
+      - uses: actions/setup-node@v4
+        with:
+          # Vite 7 wants 20.19+ or 22.12+; 22 resolves to the latest 22.x.
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install wasm-pack
+        uses: jetli/wasm-pack-action@v0.4.0
+        with:
+          version: latest
+
+      - name: Install dependencies
+        working-directory: web
+        run: npm ci
+
+      # Before the site build: Vite bundles the generated module as an asset, so
+      # it has to exist on disk first. The npm script goes through
+      # wasm-build.sh, which owns the getrandom cfg -- without it the page
+      # builds fine and dies on the first render.
+      - name: Build the WebAssembly bundle
+        working-directory: web
+        run: npm run wasm
+
+      - name: Run the site tests
+        working-directory: web
+        run: npm test
+
+      - name: Build the site
+        working-directory: web
+        run: npm run build
+
+      # A missing wasm asset produces a page that loads, shows the form, and
+      # then fails to render anything — so fail here instead of shipping it.
+      - name: Check the bundle landed
+        working-directory: web
+        run: |
+          test -f dist/index.html
+          ls dist/assets/*.wasm
+          ls dist/assets/*.js
+          # _headers is copied verbatim out of public/; without it the caching
+          # rules for the 21 MB engine would silently not be sent.
+          test -f dist/_headers
+          du -sh dist
+
+      # Cloudflare is the only host, which makes a silent skip dangerous: the
+      # run would go green having deployed nothing. Fail explicitly when the
+      # credential is missing, while still letting a fork build.
+      - name: Require the Cloudflare credential
+        if: github.repository == 'bridge-craftwork/pbn-to-pdf' && env.CLOUDFLARE_API_TOKEN == ''
+        run: |
+          echo "CLOUDFLARE_API_TOKEN is not set, so the site cannot be deployed." >&2
+          echo "The token needs Account -> Cloudflare Pages -> Edit on this account." >&2
+          exit 1
+
+      # What the credential can actually see. A deploy failure is otherwise a
+      # bare "Authentication error", indistinguishable between a wrong account,
+      # a missing permission, and a token scoped to another project.
+      - name: Show what the credential can reach
+        if: env.CLOUDFLARE_API_TOKEN != ''
+        continue-on-error: true
+        run: npx --yes wrangler@4 pages project list
+
+      # `--commit-dirty` because the checkout carries the generated wasm module,
+      # which wrangler would otherwise refuse to deploy from as an unclean tree.
+      - name: Deploy to Cloudflare Pages
+        if: env.CLOUDFLARE_API_TOKEN != ''
+        run: npx --yes wrangler@4 pages deploy --commit-dirty=true

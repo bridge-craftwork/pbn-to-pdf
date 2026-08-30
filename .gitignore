@@ -19,3 +19,8 @@ __pycache__/
 # wasm-pack output (see also wasm/.gitignore)
 /pkg/
 /pkg-node/
+
+# Web app
+web/node_modules/
+web/dist/
+web/src/wasm/
