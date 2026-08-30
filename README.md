@@ -106,8 +106,9 @@ npm test             # unit tests
 npm run check:browser  # end-to-end check against a running preview
 ```
 
-Deployed to Cloudflare Pages by `.github/workflows/pages.yml`; the hosting
-config is [`wrangler.jsonc`](wrangler.jsonc).
+Live at **<https://pbn-to-pdf.bridge-classroom.org>**, deployed to Cloudflare
+Pages by `.github/workflows/pages.yml`; the hosting config is
+[`wrangler.jsonc`](wrangler.jsonc).
 
 ## WebAssembly
 

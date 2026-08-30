@@ -9,6 +9,12 @@
 //
 // Cloudflare rather than GitHub Pages: builds land in seconds instead of the
 // 5-10 minutes Pages can take, and it carries the .com/.org domains.
+//
+// Hostnames, for the record — Pages custom domains are dashboard/API state, not
+// config, so wrangler will not create these from here:
+//
+//   pbn-to-pdf.pages.dev              the project's own domain
+//   pbn-to-pdf.bridge-classroom.org   custom domain, CNAME -> pages.dev, proxied
 {
   "name": "pbn-to-pdf",
   "compatibility_date": "2026-08-30",
