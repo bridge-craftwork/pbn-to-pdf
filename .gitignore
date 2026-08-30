@@ -15,3 +15,7 @@
 .DS_Store
 activity-log.json
 __pycache__/
+
+# wasm-pack output
+/pkg/
+/pkg-node/

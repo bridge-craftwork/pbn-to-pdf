@@ -30,6 +30,9 @@
 #   ./dev-build.sh build --release  # any cargo subcommand + args
 #   ./dev-build.sh --ci test        # CI-parity: patches disabled, committed
 #                                   # lock's git pins, lock rewrite guarded
+#   ./dev-build.sh --exec wasm-pack build ...
+#                                   # run an arbitrary cargo-invoking command
+#                                   # under the same lockfile protection
 #
 set -euo pipefail
 cd "$(dirname "$0")"
@@ -44,11 +47,27 @@ if [[ ${1:-} == --ci ]]; then
     ci_mode=1
     shift
 fi
-[[ $# -eq 0 ]] && set -- build
 
-# No local patch overrides: behave exactly like cargo.
+# By default the arguments are a cargo subcommand; --exec instead runs the rest
+# as a command of its own (wasm-pack, cargo-nextest, ...). Those shell out to
+# cargo themselves, so they need the same lock swap that a direct call gets.
+# `command` is a no-op prefix, which keeps the runner a non-empty array -- an
+# empty "${arr[@]}" is an unbound-variable error under set -u in bash 3.2.
+runner=(cargo)
+if [[ ${1:-} == --exec ]]; then
+    shift
+    if [[ $# -eq 0 ]]; then
+        echo "dev-build: --exec needs a command to run" >&2
+        exit 2
+    fi
+    runner=(command)
+elif [[ $# -eq 0 ]]; then
+    set -- build
+fi
+
+# No local patch overrides: behave exactly like a direct invocation.
 if [[ ! -f $CONFIG ]] || ! grep -q '^\[patch\.' "$CONFIG"; then
-    exec cargo "$@"
+    exec "${runner[@]}" "$@"
 fi
 
 # --- CI-parity mode: disable the patches, build with the committed lock ---
@@ -58,7 +77,7 @@ if [[ -n $ci_mode ]]; then
     mv "$CONFIG" "$CONFIG_OFF"
     restore_ci() { [[ -f $CONFIG_OFF ]] && mv "$CONFIG_OFF" "$CONFIG"; }
     trap restore_ci EXIT
-    cargo "$@"
+    "${runner[@]}" "$@"
     if [[ -n $lock_before && $(cksum < Cargo.lock) != "$lock_before" ]]; then
         echo "dev-build: NOTE: Cargo.lock was re-resolved during this CI-parity run." >&2
         echo "dev-build: review 'git diff Cargo.lock' — internal crates must keep their" >&2
@@ -104,14 +123,14 @@ verify() {
     return $ok
 }
 
-cargo "$@"
+"${runner[@]}" "$@"
 
 if [[ -f Cargo.lock ]] && ! verify; then
     # Stale dev lock from before the patches existed; it is disposable —
     # discard it and re-resolve fresh, which applies the patches.
     echo "dev-build: discarding stale dev lock and re-resolving..." >&2
     rm Cargo.lock
-    cargo "$@"
+    "${runner[@]}" "$@"
     verify || {
         echo "dev-build: ERROR: patched crates still resolve to remote sources." >&2
         echo "dev-build: check that the sibling checkouts in $CONFIG exist." >&2
