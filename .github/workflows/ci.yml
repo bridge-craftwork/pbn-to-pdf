@@ -66,3 +66,54 @@ jobs:
 
       - name: Check formatting
         run: cargo fmt --all -- --check
+
+  # wasm/ is a separate workspace -- it path-depends on this crate, so
+  # `--workspace` in the jobs above never reaches it. Without this job its
+  # bindings are never linted and a wasm32 regression ships unnoticed: the
+  # getrandom-backend class of problem compiles cleanly and only fails at
+  # runtime, on the first render.
+  wasm:
+    name: WebAssembly
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+          targets: wasm32-unknown-unknown
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: wasm
+
+      - name: Check formatting
+        working-directory: wasm
+        run: cargo fmt --all -- --check
+
+      - name: Run clippy
+        working-directory: wasm
+        run: cargo clippy --all-targets -- -D warnings
+
+      # The target that matters: everything above can pass while wasm32 fails.
+      # RUSTFLAGS mirrors wasm-build.sh -- getrandom needs the cfg as well as
+      # the feature, and without it this builds and dies at runtime instead.
+      - name: Build for wasm32
+        working-directory: wasm
+        env:
+          RUSTFLAGS: --cfg getrandom_backend="wasm_js"
+        run: cargo build --release --target wasm32-unknown-unknown
+
+      # End to end, because compiling is not evidence that it works.
+      - name: Install wasm-pack
+        uses: jetli/wasm-pack-action@v0.4.0
+        with:
+          version: latest
+
+      - name: Render every layout and validate the PDFs
+        run: |
+          ./wasm-build.sh --target nodejs --out-dir pkg-node
+          node wasm/verify.mjs

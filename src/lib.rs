@@ -4,8 +4,6 @@ pub mod error;
 pub mod model;
 pub mod parser;
 pub mod render;
-#[cfg(feature = "wasm")]
-pub mod wasm;
 
 pub use cli::Layout;
 pub use config::Settings;

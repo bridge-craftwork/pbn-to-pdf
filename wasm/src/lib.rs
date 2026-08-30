@@ -1,12 +1,12 @@
 //! WebAssembly bindings.
 //!
-//! A thin wrapper over [`crate::render_boards`], which is already a pure
+//! A thin wrapper over [`pbn_to_pdf::render_boards`], which is already a pure
 //! `&[Board] -> Vec<u8>` function: no filesystem, no clock, no environment.
 //! Fonts and the 52 card SVGs are compiled in, so a browser or Node host needs
 //! nothing but the PBN text.
 //!
 //! ```js
-//! import init, { renderPbn, layouts } from './pkg/pbn_to_pdf.js';
+//! import init, { renderPbn, layouts } from './pkg/pbn_to_pdf_wasm.js';
 //! await init();
 //! const pdf = renderPbn(pbnText, 'declarers-plan-2up');  // Uint8Array
 //! ```
@@ -15,7 +15,7 @@ use std::str::FromStr;
 
 use wasm_bindgen::prelude::*;
 
-use crate::{parse_pbn, render_boards, Layout, RenderOptions};
+use pbn_to_pdf::{parse_pbn, render_boards, Layout, RenderOptions};
 
 /// Route panics to `console.error` with a real message and stack, instead of
 /// the bare `unreachable executed` a wasm trap otherwise surfaces.

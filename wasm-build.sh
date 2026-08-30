@@ -12,11 +12,15 @@
 #     It lives here rather than in .cargo/config.toml because that file is
 #     gitignored (it holds local-only [patch] overrides).
 #
-#   * --no-default-features --features wasm. The default `cli` feature pulls
-#     clap and env_logger, which are dead weight in a wasm bundle.
+# The bindings live in the wasm/ crate, which path-depends on the renderer with
+# default-features off -- the `cli` feature pulls clap and env_logger, dead
+# weight in a bundle.
 #
-# The wasm-pack call goes through dev-build.sh --exec so it gets the same
-# Cargo.lock protection as any other cargo invocation in this repo.
+# The wasm-pack call goes through dev-build.sh --workspace wasm --exec, so
+# wasm/Cargo.lock gets the same protection the root lock has. That matters: wasm/
+# is a separate workspace, but cargo config discovery walks upward, so it
+# inherits the root [patch] overrides and its lock is exposed to the same
+# silent rewrite.
 #
 # Usage:
 #   ./wasm-build.sh                 # release bundler build -> pkg/
@@ -51,5 +55,5 @@ done
 
 export RUSTFLAGS="${RUSTFLAGS:-} --cfg getrandom_backend=\"wasm_js\""
 
-exec ./dev-build.sh --exec wasm-pack build "$@" \
-    -- --no-default-features --features wasm
+# `.` because dev-build.sh runs the command inside the selected workspace.
+exec ./dev-build.sh --workspace wasm --exec wasm-pack build . "$@"
