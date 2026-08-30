@@ -38,7 +38,52 @@ cargo fmt
 
 # Run with a PBN file
 ./dev-build.sh run -- path/to/file.pbn -o output.pdf
+
+# Build the WebAssembly package (see "WebAssembly" below)
+./wasm-build.sh
 ```
+
+## WebAssembly
+
+`./wasm-build.sh` builds the wasm package via `wasm-pack`. It exists because two
+things are easy to get wrong and silent when you do:
+
+- **`--cfg getrandom_backend="wasm_js"`.** `printpdf` and `lopdf` depend on
+  `getrandom`, which has no entropy source on `wasm32-unknown-unknown`. The
+  `wasm_js` feature (a `[target.'cfg(target_arch = "wasm32")'.dependencies]`
+  entry in `Cargo.toml`) points it at `crypto.getRandomValues`, but getrandom
+  0.3 also needs this cfg before it uses that backend. Without it the build
+  succeeds and fails at runtime on the first render. It lives in the script
+  rather than `.cargo/config.toml` because that file is gitignored.
+- **`--no-default-features --features wasm`.** The default `cli` feature pulls
+  clap and env_logger, which are dead weight in a wasm bundle.
+
+The script calls `wasm-pack` through `./dev-build.sh --exec`, so it gets the same
+`Cargo.lock` protection as any other cargo invocation here — `--exec` runs an
+arbitrary cargo-invoking command inside the lockfile swap.
+
+### Feature layout
+
+- `cli` (default) — clap and env_logger. Both binaries declare
+  `required-features = ["cli"]`. `Settings::from_args` and the `Args` struct are
+  gated on it; the shared enums (`Layout`, `PageSize`, ...) are always compiled
+  and only their `ValueEnum` derive is conditional.
+- `wasm` — `src/wasm.rs`, a thin wasm-bindgen wrapper over `render_boards`.
+
+`Layout::as_str`/`FromStr` give non-clap consumers the same layout spellings the
+CLI accepts; a test asserts they match clap's `ValueEnum` names so they can't
+drift apart.
+
+### Verifying a wasm build
+
+`./wasm-build.sh --target nodejs --out-dir pkg-node && node tests/wasm/node_smoke_test.mjs`
+renders every layout and validates the PDFs. Compiling is not sufficient
+evidence that a wasm build works — the getrandom trap above and the SVG font
+issue below both compile cleanly and fail (or silently degrade) only at runtime.
+
+Every layout renders pixel-identical in native and wasm, verified by
+rasterizing both and comparing. That depends on the card rank indices being
+vector paths rather than `<text>` — see below.
 
 ## Architecture
 
@@ -110,9 +155,42 @@ Integration tests generate PDFs in `tests/output/` for visual verification:
 - `fan_test.pdf` - Fan renderer test
 - `full_deck_compass.pdf` - Full 52-card compass layout
 
+## Card asset pipeline
+
+`assets/cards/*.svg` are the 52 base cards; `assets/cards/variants/` holds the
+24 reduced court-card assets derived from them. Two tools maintain these, and
+they run in order:
+
+```bash
+python3 tools/svg_text_to_paths.py     # needs fonttools; usually already done
+python3 tools/make_card_variants.py    # regenerate variants after any base edit
+```
+
+`svg_text_to_paths.py` is why the corner rank indices are `<path>` and not
+`<text>`. The originals drew them as `<text font-family="Arial">`, which usvg
+resolves through a *system* font database — so the same input rendered
+differently on macOS, Linux and CI, and the glyphs vanished entirely in wasm
+(`printpdf::Svg::parse` hardcodes an empty `usvg::Options` on `wasm32` and
+exposes no way to supply fonts). Baking the outlines cost nothing in the PDF:
+printpdf sets svg2pdf's `embed_text = false`, so those glyphs were already being
+flattened to paths on every render. Measured on 2-, 4- and 8-board sets, the
+PDFs got ~1% *smaller* and the rendering is visually unchanged.
+
+The font is Arimo (SIL OFL), metrically identical to Arial — every glyph used
+has a bit-identical advance width. `assets/fonts/Arimo-CardRanks.ttf` is a
+14-glyph subset kept only so the tool can be re-run reproducibly; it is **not**
+compiled into the binary. Its licence is `assets/fonts/LICENSE-Arimo.txt`.
+
+Converted indices carry `class="rank-index"` (or `"rank-index mirror"`), which
+is how `make_card_variants.py` picks them out — it classifies the other elements
+by geometry, so the indices have to announce themselves.
+
 ## Embedded Assets
 
-- **Fonts**: DejaVu Sans, TeX Gyre Termes (embedded for cross-platform consistency)
+- **Fonts**: only a 5-glyph DejaVu Sans subset (the four suit symbols) is
+  embedded, and it is the sole font program in the output PDFs. Body text uses
+  the PDF standard-14 builtins (Times, Helvetica), which the viewer supplies --
+  see `src/render/helpers/fonts.rs`.
 - **Card SVGs**: 52 playing cards in `assets/cards/` (58.94mm × 85.61mm at 300 DPI)
 
 ## PBN Format Notes
