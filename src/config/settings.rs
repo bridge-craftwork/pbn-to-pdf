@@ -1,4 +1,6 @@
-use crate::cli::{Args, Layout, MarginPreset};
+#[cfg(feature = "cli")]
+use crate::cli::Args;
+use crate::cli::{Layout, MarginPreset};
 use crate::model::{FontSettings, PbnMetadata};
 
 use super::defaults::*;
@@ -141,6 +143,7 @@ impl Default for Settings {
 
 impl Settings {
     /// Create settings from CLI arguments
+    #[cfg(feature = "cli")]
     pub fn from_args(args: &Args) -> Self {
         let (page_width, page_height) = args.page_dimensions();
 

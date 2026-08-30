@@ -237,18 +237,7 @@
 
 
 
-<text
-   xml:space="preserve"
-   style="font-size:32px;font-style:normal;font-weight:normal;line-height:125%;letter-spacing:0px;word-spacing:0px;fill:#df0000;fill-opacity:1;stroke:none;font-family:Bitstream Vera Sans"
-   x="0.91949666"
-   y="28.013288"
-   id="text3788"
-   sodipodi:linespacing="125%"><tspan
-     sodipodi:role="line"
-     id="tspan3790"
-     x="0.91949666"
-     y="28.013288"
-     style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;fill:#df0000;fill-opacity:1;font-family:Arial;-inkscape-font-specification:Arial">2</tspan></text>
+<path d="M17.11 25.62V28.01H2.53V26.03Q3.33 24.2 4.46 22.79Q5.59 21.39 6.87 20.26Q8.15 19.14 9.4 18.17Q10.03 17.69 10.58 17.2Q11.14 16.72 11.64 16.23Q12.64 15.26 13.26 14.2Q13.87 13.14 13.87 11.79Q13.87 9.98 12.81 8.98Q11.75 7.98 9.86 7.98Q8.06 7.98 6.9 8.96Q5.73 9.94 5.53 11.7L2.65 11.44Q2.97 8.79 4.9 7.23Q6.83 5.67 9.86 5.67Q13.19 5.67 14.97 7.24Q16.76 8.81 16.76 11.7Q16.76 12.98 16.18 14.25Q15.59 15.51 14.44 16.78Q13.86 17.4 12.75 18.39Q11.64 19.37 10.01 20.7Q8.22 22.17 7.15 23.35Q6.09 24.53 5.62 25.62Z" style="fill:#df0000;fill-opacity:1;stroke:none" id="text3788" class="rank-index" />
 
 
 
@@ -263,19 +252,7 @@
      inkscape:connector-curvature="0"
      id="hl-8"
      d="M 3.676,-9 C 0.433,-9 0,-5.523 0,-5.523 0,-5.523 -0.433,-9 -3.676,-9 -5.946,-9 -8,-7.441 -8,-4.5 -8,-0.614 -1.4208493,3.2938141 0,9 1.35201,3.2985969 8,-0.614 8,-4.5 8,-7.441 5.946,-9 3.676,-9 z"
-     sodipodi:nodetypes="scsscss" /></g><text
-   xml:space="preserve"
-   style="font-size:32px;font-style:normal;font-weight:normal;line-height:125%;letter-spacing:0px;word-spacing:0px;fill:#df0000;fill-opacity:1;stroke:none;font-family:Bitstream Vera Sans"
-   x="-166.0"
-   y="-213.51517"
-   id="text3788-4"
-   sodipodi:linespacing="125%"
-   transform="scale(-1,-1)"><tspan
-     sodipodi:role="line"
-     id="tspan3790-3"
-     x="-166.0"
-     y="-213.51517"
-     style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;fill:#df0000;fill-opacity:1;font-family:Arial;-inkscape-font-specification:Arial">2</tspan></text>
+     sodipodi:nodetypes="scsscss" /></g><path d="M149.81 215.91V213.52H164.39V215.5Q163.59 217.33 162.46 218.73Q161.33 220.14 160.05 221.27Q158.77 222.39 157.52 223.36Q156.89 223.84 156.34 224.33Q155.78 224.81 155.28 225.3Q154.28 226.27 153.66 227.33Q153.05 228.39 153.05 229.73Q153.05 231.55 154.11 232.55Q155.17 233.55 157.06 233.55Q158.86 233.55 160.02 232.57Q161.19 231.59 161.39 229.83L164.27 230.09Q163.95 232.73 162.02 234.3Q160.09 235.86 157.06 235.86Q153.73 235.86 151.95 234.29Q150.16 232.72 150.16 229.83Q150.16 228.55 150.74 227.28Q151.33 226.02 152.48 224.75Q153.06 224.12 154.17 223.14Q155.28 222.16 156.91 220.83Q158.7 219.36 159.77 218.18Q160.83 217 161.3 215.91Z" style="fill:#df0000;fill-opacity:1;stroke:none" id="text3788-4" class="rank-index mirror" />
 
 
 

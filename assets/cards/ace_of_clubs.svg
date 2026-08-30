@@ -186,18 +186,7 @@
 			
 		</g>
 	</g>
-<text
-   xml:space="preserve"
-   style="font-size:32px;font-style:normal;font-weight:normal;line-height:125%;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none;font-family:Bitstream Vera Sans"
-   x="0.45905292"
-   y="27.548409"
-   id="text3788"
-   sodipodi:linespacing="125%"><tspan
-     sodipodi:role="line"
-     id="tspan3790"
-     x="0.45905292"
-     y="27.548409"
-     style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-family:Arial;-inkscape-font-specification:Arial">A</tspan></text>
+<path d="M6.15 21.11 3.62 27.55H0.52L9.51 5.53H12.9L21.74 27.55H18.69L16.18 21.11ZM11.16 7.78Q10.9 8.66 10.53 9.73Q10.16 10.8 9.85 11.61L7.05 18.78H15.29L12.46 11.52Q12.24 10.97 11.88 9.97Q11.52 8.97 11.16 7.78Z" style="fill:#000000;fill-opacity:1;stroke:none" id="text3788" class="rank-index" />
 
 
 <g
@@ -236,19 +225,7 @@
      id="cl-9"
      d="m 50.291466,22.698228 c 0,0 2.375,-1.9 2.375,-4.534 0,-1.542 -1.369,-4.102 -4.534,-4.102 -3.165,0 -4.534,2.561 -4.534,4.102 0,2.634 2.375,4.534 2.375,4.534 -2.638,-2.055 -7.341,-0.652 -7.341,3.455 0,2.056 1.68,4.318 4.318,4.318 3.165,0 4.534,-3.455 4.534,-3.455 0,0 0.402,3.938 -1.943,6.046 h 5.182 c -2.345,-2.107 -1.943,-6.046 -1.943,-6.046 0,0 1.369,3.455 4.534,3.455 2.639,0 4.318,-2.263 4.318,-4.318 0,-4.107 -4.703,-5.51 -7.341,-3.455 z"
      inkscape:connector-curvature="0"
-     style="fill:#000000" /></g><text
-   xml:space="preserve"
-   style="font-size:32px;font-style:normal;font-weight:normal;line-height:125%;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none;font-family:Bitstream Vera Sans"
-   x="-158.86395"
-   y="-214.4666"
-   id="text3788-8"
-   sodipodi:linespacing="125%"
-   transform="scale(-1,-1)"><tspan
-     sodipodi:role="line"
-     id="tspan3790-7"
-     x="-158.86395"
-     y="-214.4666"
-     style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-family:Arial;-inkscape-font-specification:Arial">A</tspan></text>
+     style="fill:#000000" /></g><path d="M153.18 220.9 155.71 214.47H158.8L149.82 236.48H146.43L137.58 214.47H140.63L143.15 220.9ZM148.16 234.23Q148.43 233.36 148.79 232.29Q149.16 231.22 149.47 230.4L152.27 223.23H144.04L146.86 230.5Q147.08 231.04 147.44 232.04Q147.8 233.04 148.16 234.23Z" style="fill:#000000;fill-opacity:1;stroke:none" id="text3788-8" class="rank-index mirror" />
 <g
    transform="matrix(-1.0012222,0,0,-1.0012222,203.70615,226.41464)"
    id="layer1-1-4-1"><path

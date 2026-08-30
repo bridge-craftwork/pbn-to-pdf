@@ -87,18 +87,7 @@
 			
 		</g>
 	</g>
-<text
-   xml:space="preserve"
-   style="font-size:32px;font-style:normal;font-weight:normal;line-height:125%;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none;font-family:Bitstream Vera Sans"
-   x="1.1565353"
-   y="28.013288"
-   id="text3788"
-   sodipodi:linespacing="125%"><tspan
-     sodipodi:role="line"
-     id="tspan3790"
-     x="1.1565353"
-     y="28.013288"
-     style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-family:Arial;-inkscape-font-specification:Arial">4</tspan></text>
+<path d="M14.92 23.03V28.01H12.27V23.03H1.89V20.84L11.97 6H14.92V20.81H18.02V23.03ZM4.48 20.81H12.27V12.03Q12.27 11.31 12.27 10.6Q12.28 9.89 12.33 9.17Q11.97 9.86 11.7 10.29Q11.44 10.72 11.22 11.03Z" style="fill:#000000;fill-opacity:1;stroke:none" id="text3788" class="rank-index" />
 
 
 
@@ -117,19 +106,7 @@
      d="M 7.989,3.103 C 7.747,-0.954 0.242,-8.59 0,-10.5 c -0.242,1.909 -7.747,9.545 -7.989,13.603 -0.169,2.868 1.695,4.057 3.39,4.057 1.8351685,-0.021581 3.3508701,-2.8006944 3.873,-3.341 0.242,0.716 -1.603,6.682 -2.179,6.682 l 5.811,0 C 2.33,10.501 0.485,4.535 0.727,3.819 1.1841472,4.3152961 2.5241276,7.0768295 4.601,7.16 6.295,7.159 8.158,5.971 7.989,3.103 z"
      inkscape:connector-curvature="0"
      style="fill:#000000"
-     sodipodi:nodetypes="cccccccccc" /></g><text
-   xml:space="preserve"
-   style="font-size:32px;font-style:normal;font-weight:normal;line-height:125%;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none;font-family:Bitstream Vera Sans"
-   x="-165.69579"
-   y="-215.12402"
-   id="text3788-7"
-   sodipodi:linespacing="125%"
-   transform="scale(-1,-1)"><tspan
-     sodipodi:role="line"
-     id="tspan3790-6"
-     x="-165.69579"
-     y="-215.12402"
-     style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-family:Arial;-inkscape-font-specification:Arial">4</tspan></text>
+     sodipodi:nodetypes="cccccccccc" /></g><path d="M151.93 220.11V215.12H154.59V220.11H164.96V222.3L154.88 237.14H151.93V222.33H148.84V220.11ZM162.37 222.33H154.59V231.11Q154.59 231.83 154.58 232.54Q154.57 233.25 154.52 233.97Q154.88 233.28 155.15 232.85Q155.41 232.42 155.63 232.11Z" style="fill:#000000;fill-opacity:1;stroke:none" id="text3788-7" class="rank-index mirror" />
 
 
 <g

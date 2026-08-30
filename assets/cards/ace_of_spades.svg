@@ -84,18 +84,7 @@
 			
 		</g>
 	</g>
-<text
-   xml:space="preserve"
-   style="font-size:32px;font-style:normal;font-weight:normal;line-height:125%;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none;font-family:Bitstream Vera Sans"
-   x="1.1565353"
-   y="28.013288"
-   id="text3788"
-   sodipodi:linespacing="125%"><tspan
-     sodipodi:role="line"
-     id="tspan3790"
-     x="1.1565353"
-     y="28.013288"
-     style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-family:Arial;-inkscape-font-specification:Arial">A</tspan></text>
+<path d="M6.84 21.58 4.31 28.01H1.22L10.2 6H13.59L22.44 28.01H19.39L16.88 21.58ZM11.86 8.25Q11.59 9.12 11.23 10.19Q10.86 11.26 10.55 12.08L7.75 19.25H15.98L13.16 11.98Q12.94 11.44 12.58 10.44Q12.22 9.44 11.86 8.25Z" style="fill:#000000;fill-opacity:1;stroke:none" id="text3788" class="rank-index" />
 <g
    transform="matrix(1.1387716,0,0,1.0411919,11.176453,39.912003)"
    id="layer1-7"><path
@@ -103,19 +92,7 @@
      d="M 7.989,3.103 C 7.747,-0.954 0.242,-8.59 0,-10.5 c -0.242,1.909 -7.747,9.545 -7.989,13.603 -0.169,2.868 1.695,4.057 3.39,4.057 1.8351685,-0.021581 3.3508701,-2.8006944 3.873,-3.341 0.242,0.716 -1.603,6.682 -2.179,6.682 l 5.811,0 C 2.33,10.501 0.485,4.535 0.727,3.819 1.1841472,4.3152961 2.5241276,7.0768295 4.601,7.16 6.295,7.159 8.158,5.971 7.989,3.103 z"
      inkscape:connector-curvature="0"
      style="fill:#000000"
-     sodipodi:nodetypes="cccccccccc" /></g><text
-   xml:space="preserve"
-   style="font-size:32px;font-style:normal;font-weight:normal;line-height:125%;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none;font-family:Bitstream Vera Sans"
-   x="-165.69579"
-   y="-215.09668"
-   id="text3788-2"
-   sodipodi:linespacing="125%"
-   transform="scale(-1,-1)"><tspan
-     sodipodi:role="line"
-     id="tspan3790-3"
-     x="-165.69579"
-     y="-215.09668"
-     style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-family:Arial;-inkscape-font-specification:Arial">A</tspan></text>
+     sodipodi:nodetypes="cccccccccc" /></g><path d="M160.01 221.53 162.54 215.1H165.63L156.65 237.11H153.26L144.41 215.1H147.46L149.98 221.53ZM154.99 234.86Q155.26 233.99 155.63 232.92Q155.99 231.85 156.31 231.03L159.1 223.86H150.87L153.7 231.13Q153.91 231.67 154.27 232.67Q154.63 233.67 154.99 234.86Z" style="fill:#000000;fill-opacity:1;stroke:none" id="text3788-2" class="rank-index mirror" />
 <g
    transform="matrix(-1.1387716,0,0,-1.0411919,155.67586,202.57385)"
    id="layer1-7-8"><path

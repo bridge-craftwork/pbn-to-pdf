@@ -5,13 +5,44 @@ edition = "2021"
 description = "Convert PBN bridge files to PDF with Bridge Composer-style formatting"
 license = "Unlicense"
 
+[lib]
+# cdylib is what wasm-bindgen links against; rlib keeps the crate usable as a
+# normal Rust dependency (and by this crate's own binaries and tests).
+crate-type = ["cdylib", "rlib"]
+
+[features]
+default = ["cli"]
+# Argument parsing and logging for the binaries. Off for wasm, where clap and
+# env_logger are dead weight and there is no argv to parse.
+cli = ["dep:clap", "dep:env_logger"]
+# Browser/Node bindings over the pure `boards -> PDF bytes` core.
+wasm = ["dep:wasm-bindgen", "dep:console_error_panic_hook"]
+
 [dependencies]
-clap = { version = "4.5", features = ["derive"] }
+clap = { version = "4.5", features = ["derive"], optional = true }
 printpdf = { git = "https://github.com/fschutt/printpdf", rev = "1f30cafc", features = ["svg"] }
 nom = "8.0"
 thiserror = "2.0"
 anyhow = "1.0"
 log = "0.4"
-env_logger = "0.11"
+env_logger = { version = "0.11", optional = true }
 bridge-types = { git = "https://github.com/bridge-craftwork/bridge-types" }
 lopdf = "0.35"  # PDF post-processing for compression
+wasm-bindgen = { version = "0.2", optional = true }
+console_error_panic_hook = { version = "0.1", optional = true }
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+# printpdf and lopdf pull getrandom, which has no default source of entropy on
+# wasm32-unknown-unknown. The wasm_js backend routes it at crypto.getRandomValues;
+# it also needs --cfg getrandom_backend="wasm_js", which wasm-build.sh sets.
+getrandom = { version = "0.3", features = ["wasm_js"] }
+
+[[bin]]
+name = "pbn-to-pdf"
+path = "src/main.rs"
+required-features = ["cli"]
+
+[[bin]]
+name = "layout_debug"
+path = "src/bin/layout_debug.rs"
+required-features = ["cli"]

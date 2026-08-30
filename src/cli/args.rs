@@ -1,6 +1,9 @@
-use clap::{Parser, ValueEnum};
+#[cfg(feature = "cli")]
+use clap::Parser;
+#[cfg(feature = "cli")]
 use std::path::PathBuf;
 
+#[cfg(feature = "cli")]
 #[derive(Parser, Debug)]
 #[command(name = "pbn-to-pdf")]
 #[command(
@@ -84,7 +87,8 @@ pub struct Args {
 }
 
 /// Preset margin sizes
-#[derive(Copy, Clone, Debug, PartialEq, Eq, ValueEnum)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "cli", derive(clap::ValueEnum))]
 pub enum MarginPreset {
     /// Narrow margins (1/4 inch = 6.35mm)
     Narrow,
@@ -105,7 +109,8 @@ impl MarginPreset {
     }
 }
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq, ValueEnum)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "cli", derive(clap::ValueEnum))]
 pub enum PageSize {
     Letter,
     A4,
@@ -122,14 +127,16 @@ impl PageSize {
     }
 }
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq, ValueEnum)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "cli", derive(clap::ValueEnum))]
 pub enum Orientation {
     Portrait,
     Landscape,
 }
 
 /// Output layout style
-#[derive(Copy, Clone, Debug, PartialEq, Eq, ValueEnum, Default)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Default)]
+#[cfg_attr(feature = "cli", derive(clap::ValueEnum))]
 pub enum Layout {
     /// Standard analysis layout with hand diagram, bidding, and commentary
     #[default]
@@ -137,10 +144,10 @@ pub enum Layout {
     /// Bidding practice sheets for face-to-face practice
     BiddingSheets,
     /// Declarer's plan - 1 deal per page (full size)
-    #[value(name = "declarers-plan-1up")]
+    #[cfg_attr(feature = "cli", value(name = "declarers-plan-1up"))]
     DeclarersPlan1up,
     /// Declarer's plan - 2 deals per page (rotated 90°)
-    #[value(name = "declarers-plan-2up")]
+    #[cfg_attr(feature = "cli", value(name = "declarers-plan-2up"))]
     DeclarersPlan2up,
     /// Declarer's plan practice sheets (4 deals per page)
     DeclarersPlan,
@@ -168,8 +175,56 @@ impl Layout {
             Layout::DeclarersPlan | Layout::DeclarersPlan1up | Layout::DeclarersPlan2up
         )
     }
+
+    /// Every layout, in CLI declaration order.
+    pub const ALL: [Layout; 6] = [
+        Layout::Analysis,
+        Layout::BiddingSheets,
+        Layout::DeclarersPlan1up,
+        Layout::DeclarersPlan2up,
+        Layout::DeclarersPlan,
+        Layout::DealerSummary,
+    ];
+
+    /// The layout's canonical name, identical to its `--layout` spelling.
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Layout::Analysis => "analysis",
+            Layout::BiddingSheets => "bidding-sheets",
+            Layout::DeclarersPlan1up => "declarers-plan-1up",
+            Layout::DeclarersPlan2up => "declarers-plan-2up",
+            Layout::DeclarersPlan => "declarers-plan",
+            Layout::DealerSummary => "dealer-summary",
+        }
+    }
 }
 
+impl std::fmt::Display for Layout {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
+impl std::str::FromStr for Layout {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Layout::ALL
+            .iter()
+            .copied()
+            .find(|layout| layout.as_str() == s)
+            .ok_or_else(|| {
+                let names: Vec<&str> = Layout::ALL.iter().map(|l| l.as_str()).collect();
+                format!(
+                    "unknown layout '{}' (expected one of: {})",
+                    s,
+                    names.join(", ")
+                )
+            })
+    }
+}
+
+#[cfg(feature = "cli")]
 impl Args {
     /// Get the output path, defaulting to input with layout-specific suffix
     pub fn output_path(&self) -> PathBuf {
@@ -270,6 +325,25 @@ mod tests {
     use super::*;
 
     #[test]
+    fn layout_names_round_trip() {
+        for layout in Layout::ALL {
+            assert_eq!(layout.as_str().parse::<Layout>(), Ok(layout));
+        }
+    }
+
+    /// `as_str` is what non-clap consumers (wasm) parse; clap's ValueEnum names
+    /// are what the CLI accepts. They must stay identical.
+    #[cfg(feature = "cli")]
+    #[test]
+    fn layout_names_match_clap_value_names() {
+        use clap::ValueEnum;
+        for layout in Layout::ALL {
+            let clap_name = layout.to_possible_value().unwrap();
+            assert_eq!(clap_name.get_name(), layout.as_str());
+        }
+    }
+
+    #[test]
     fn test_parse_single_board() {
         let result = parse_board_range("5").unwrap();
         assert_eq!(result, vec![5]);
@@ -287,6 +361,7 @@ mod tests {
         assert_eq!(result, vec![1, 2, 3, 7, 10, 11, 12]);
     }
 
+    #[cfg(feature = "cli")]
     #[test]
     fn test_page_dimensions() {
         let args = Args {

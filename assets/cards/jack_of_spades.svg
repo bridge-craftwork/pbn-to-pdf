@@ -218,18 +218,7 @@
 
 
 
-<text
-   xml:space="preserve"
-   style="font-size:32px;font-style:normal;font-weight:normal;line-height:125%;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none;font-family:Bitstream Vera Sans"
-   x="3.5828743"
-   y="28.013288"
-   id="text3788"
-   sodipodi:linespacing="125%"><tspan
-     sodipodi:role="line"
-     id="tspan3790"
-     x="3.5828743"
-     y="28.013288"
-     style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-family:Arial;-inkscape-font-specification:Arial">J</tspan></text>
+<path d="M10.72 28.33Q7.93 28.33 6.27 26.88Q4.61 25.44 4.08 22.54L7 22.06Q7.29 23.87 8.27 24.89Q9.25 25.9 10.74 25.9Q12.36 25.9 13.3 24.79Q14.24 23.67 14.24 21.51V8.44H10V6H17.21V21.45Q17.21 24.65 15.47 26.49Q13.74 28.33 10.72 28.33Z" style="fill:#000000;fill-opacity:1;stroke:none" id="text3788" class="rank-index" />
 
 
 
@@ -303,19 +292,7 @@
      d="M 7.989,3.103 C 7.747,-0.954 0.242,-8.59 0,-10.5 c -0.242,1.909 -7.747,9.545 -7.989,13.603 -0.169,2.868 1.695,4.057 3.39,4.057 1.8351685,-0.021581 3.3508701,-2.8006944 3.873,-3.341 0.242,0.716 -1.603,6.682 -2.179,6.682 l 5.811,0 C 2.33,10.501 0.485,4.535 0.727,3.819 1.1841472,4.3152961 2.5241276,7.0768295 4.601,7.16 6.295,7.159 8.158,5.971 7.989,3.103 z"
      inkscape:connector-curvature="0"
      style="fill:#000000"
-     sodipodi:nodetypes="cccccccccc" /></g><text
-   xml:space="preserve"
-   style="font-size:32px;font-style:normal;font-weight:normal;line-height:125%;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none;font-family:Bitstream Vera Sans"
-   x="-163.59825"
-   y="-215.13002"
-   id="text3788-1"
-   sodipodi:linespacing="125%"
-   transform="scale(-1,-1)"><tspan
-     sodipodi:role="line"
-     id="tspan3790-0"
-     x="-163.59825"
-     y="-215.13002"
-     style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-family:Arial;-inkscape-font-specification:Arial">J</tspan></text>
+     sodipodi:nodetypes="cccccccccc" /></g><path d="M156.46 214.82Q159.25 214.82 160.91 216.26Q162.57 217.71 163.1 220.6L160.18 221.08Q159.9 219.27 158.91 218.26Q157.93 217.24 156.44 217.24Q154.82 217.24 153.88 218.36Q152.94 219.47 152.94 221.63V234.71H157.18V237.15H149.97V221.69Q149.97 218.49 151.71 216.65Q153.44 214.82 156.46 214.82Z" style="fill:#000000;fill-opacity:1;stroke:none" id="text3788-1" class="rank-index mirror" />
 
 
 

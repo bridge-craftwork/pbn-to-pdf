@@ -90,6 +90,42 @@ pbn-to-pdf hands.pbn -l bidding-sheets -t "My Practice Session"
 pbn-to-pdf hands.pbn -l bidding-sheets -t
 ```
 
+## WebAssembly
+
+The renderer also builds for the browser and Node. `render_boards` is a pure
+`boards -> PDF bytes` function and every asset (fonts, card art) is compiled in,
+so the wasm build needs no filesystem and no network.
+
+```bash
+./wasm-build.sh                                  # bundler package in pkg/
+./wasm-build.sh --target nodejs --out-dir pkg-node
+./wasm-build.sh --target web                     # for a plain <script type="module">
+```
+
+```js
+import init, { renderPbn, boardCount, layouts, RenderOptions } from "./pkg/pbn_to_pdf.js";
+
+await init();
+
+const pdf = renderPbn(pbnText, "declarers-plan-2up");   // Uint8Array of PDF bytes
+const url = URL.createObjectURL(new Blob([pdf], { type: "application/pdf" }));
+```
+
+`layouts()` returns the layout names, which are the same strings the CLI's
+`--layout` accepts. `RenderOptions` carries the declarer's-plan card-circling
+flags. Errors (an unknown layout, a PBN with no boards) are thrown as JS
+exceptions.
+
+After building for Node, `node tests/wasm/node_smoke_test.mjs` renders every
+layout and checks the resulting PDFs.
+
+The bundle is large — about 21 MB raw, 8.8 MB gzipped — because the 52 card SVGs
+are compiled in. Serve it compressed, and expect the fetch to dominate the first
+render.
+
+Output matches the native build: every layout renders pixel-identical PDFs in
+both, verified by rasterizing and comparing.
+
 ## PBN Format Support
 
 The tool supports PBN 2.1 format including:
@@ -106,4 +142,11 @@ The tool supports PBN 2.1 format including:
 
 ## License
 
-This project is released under the Unlicense (public domain).
+The source is released under the Unlicense (public domain).
+
+Bundled assets come from third parties and are listed in
+[THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md). In short: the card artwork is
+public domain (Byron Knoll's *vector-playing-cards*); the embedded suit-symbol
+font is a DejaVu Sans subset under the Bitstream Vera Fonts Copyright, which
+requires its notice to travel with copies; and Arimo (SIL OFL), used only by the
+asset tooling, ships with the repo but not in the binary.
