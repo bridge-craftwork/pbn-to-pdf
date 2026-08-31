@@ -1774,3 +1774,82 @@ fn test_declarers_plan_does_not_embed_unused_court_art() {
         );
     }
 }
+
+/// `Layout::preview_boards` promises a first page that represents the layout.
+///
+/// For the card-geometry layouts that is checkable: exactly that many boards
+/// fill one page, and one more spills. `analysis` and `bidding-sheets` are
+/// excluded from that half because their paging is content-driven — commentary
+/// length and auction length respectively — so their counts are samples rather
+/// than capacities, and the preview shows the first page of what comes back.
+#[test]
+fn preview_boards_renders_a_representative_first_page() {
+    let content = fs::read_to_string(fixtures_path().join("Stayman.pbn")).unwrap();
+    let pbn = parse_pbn(&content).unwrap();
+    let comments: Vec<String> = content
+        .lines()
+        .filter(|l| l.starts_with('%'))
+        .map(String::from)
+        .collect();
+
+    let page_count = |boards: &[pbn_to_pdf::Board], layout: Layout| -> usize {
+        let pdf = render_boards(boards, &comments, layout, RenderOptions::default()).unwrap();
+        let text = String::from_utf8_lossy(&pdf);
+        // /Type /Page, but not the /Type /Pages node that holds them -- a plain
+        // substring count of the former silently includes every one of the latter.
+        text.match_indices("/Type")
+            .filter(|(i, _)| {
+                let rest = text[i + "/Type".len()..].trim_start();
+                rest.strip_prefix("/Page")
+                    .is_some_and(|after| !after.starts_with('s'))
+            })
+            .count()
+    };
+
+    // Boards that actually carry a deal; the fixture has placeholder entries
+    // whose hands parse to nothing.
+    let usable: Vec<pbn_to_pdf::Board> = pbn
+        .boards
+        .iter()
+        .filter(|b| b.deal.north.card_count() == 13)
+        .take(12)
+        .cloned()
+        .collect();
+    assert!(
+        usable.len() >= 8,
+        "fixture no longer has enough usable boards"
+    );
+
+    for layout in Layout::ALL {
+        let n = layout.preview_boards() as usize;
+        assert!(n >= 1, "{layout} previews zero boards");
+        assert!(
+            n <= usable.len(),
+            "{layout} previews more boards than the fixture provides"
+        );
+
+        let preview = page_count(&usable[..n], layout);
+        assert!(preview >= 1, "{layout} preview produced no pages");
+
+        // Only the card-geometry layouts have a capacity worth asserting. How
+        // many boards fit a page of `analysis` depends on how much commentary
+        // each carries, and a page of `bidding-sheets` on how long the auctions
+        // run -- for those two the count is a sample, and the preview shows the
+        // first page of whatever comes back.
+        let fixed_geometry = matches!(
+            layout,
+            Layout::DeclarersPlan
+                | Layout::DeclarersPlan1up
+                | Layout::DeclarersPlan2up
+                | Layout::DealerSummary
+        );
+        if fixed_geometry {
+            assert_eq!(preview, 1, "{layout} preview should be a single page");
+            let spilled = page_count(&usable[..n + 1], layout);
+            assert!(
+                spilled > preview,
+                "{layout} fits more than preview_boards() = {n}; the count is too low",
+            );
+        }
+    }
+}

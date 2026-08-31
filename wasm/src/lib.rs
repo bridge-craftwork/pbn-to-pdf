@@ -15,7 +15,8 @@ use std::str::FromStr;
 
 use wasm_bindgen::prelude::*;
 
-use pbn_to_pdf::{parse_pbn, render_boards, Layout, RenderOptions};
+use pbn_to_pdf::cli::parse_board_range;
+use pbn_to_pdf::{parse_pbn, render_boards, Board, Layout, RenderOptions};
 
 /// Route panics to `console.error` with a real message and stack, instead of
 /// the bare `unreachable executed` a wasm trap otherwise surfaces.
@@ -27,8 +28,16 @@ pub fn start() {
 /// Card-circling flags for the declarer's plan layouts. Other layouts ignore
 /// them. Construct with `new RenderOptions()` and set the fields you want.
 #[wasm_bindgen(js_name = RenderOptions)]
-#[derive(Debug, Default, Clone, Copy)]
+#[derive(Debug, Default, Clone)]
 pub struct WasmRenderOptions {
+    /// Which boards to include, in the CLI's `--boards` syntax: `"1-8"`,
+    /// `"5,8,12"`, or a mix. Empty or unset renders every board.
+    ///
+    /// Boards are selected by their `[Board]` number, not their position in the
+    /// file, so a set numbered 17-32 will not respond to `"1"`. Use
+    /// `renderFirstBoard` when you want the first board whatever it is called.
+    #[wasm_bindgen(getter_with_clone, js_name = boards)]
+    pub boards: Option<String>,
     /// Circle sure winners in red (highest priority).
     #[wasm_bindgen(js_name = circleSureWinners)]
     pub circle_sure_winners: bool,
@@ -58,6 +67,28 @@ impl From<WasmRenderOptions> for RenderOptions {
     }
 }
 
+/// Apply an options `boards` spec, matching what the CLI's `--boards` does:
+/// select by `[Board]` number, and drop boards that carry no number at all.
+fn select_boards(boards: Vec<Board>, spec: Option<&str>) -> Result<Vec<Board>, JsError> {
+    let Some(spec) = spec.map(str::trim).filter(|s| !s.is_empty()) else {
+        return Ok(boards);
+    };
+    let wanted =
+        parse_board_range(spec).map_err(|e| JsError::new(&format!("Invalid board range: {e}")))?;
+    let selected: Vec<Board> = boards
+        .into_iter()
+        .filter(|b| b.number.map(|n| wanted.contains(&n)).unwrap_or(false))
+        .collect();
+    if selected.is_empty() {
+        // Distinct from an empty file: the boards exist, the spec missed them.
+        return Err(JsError::new(&format!(
+            "No boards matched '{spec}'. Boards are selected by their [Board] number, \
+             which need not start at 1."
+        )));
+    }
+    Ok(selected)
+}
+
 /// The layout names `renderPbn` accepts, in CLI order.
 #[wasm_bindgen]
 pub fn layouts() -> Vec<String> {
@@ -77,12 +108,75 @@ pub fn board_count(pbn: &str) -> Result<usize, JsError> {
 /// Render PBN text to PDF bytes.
 ///
 /// `layout` is one of the names from [`layouts`]. `options` may be omitted or
-/// null, in which case no cards are circled.
+/// null, in which case every board is rendered and no cards are circled.
 #[wasm_bindgen(js_name = renderPbn)]
 pub fn render_pbn(
     pbn: &str,
     layout: &str,
     options: Option<WasmRenderOptions>,
+) -> Result<Vec<u8>, JsError> {
+    let options = options.unwrap_or_default();
+    let spec = options.boards.clone();
+    render_selected(pbn, layout, options, |boards| {
+        select_boards(boards, spec.as_deref())
+    })
+}
+
+/// Boards worth rendering to preview `layout` — see [`Layout::preview_boards`].
+///
+/// One for the 1-up plan, two for 2-up, four for 4-up, six for a dealer
+/// summary, five for bidding sheets.
+#[wasm_bindgen(js_name = previewBoardCount)]
+pub fn preview_board_count(layout: &str) -> Result<u32, JsError> {
+    Ok(Layout::from_str(layout)
+        .map_err(|e| JsError::new(&e))?
+        .preview_boards())
+}
+
+/// Render the first `count` boards in the file, whatever they are numbered.
+///
+/// This is how a preview is built: rendering a lesson's opening boards through
+/// each layout costs a fraction of the whole set. Positional rather than by
+/// `[Board]` number, because a sliced set may be numbered from anything and a
+/// preview must not depend on that.
+///
+/// Pair it with [`preview_board_count`]. The result can run to more than one
+/// page — bidding sheets in particular, where paging follows auction length —
+/// and a preview is expected to show the first page and drop the rest.
+#[wasm_bindgen(js_name = renderFirstBoards)]
+pub fn render_first_boards(
+    pbn: &str,
+    layout: &str,
+    count: usize,
+    options: Option<WasmRenderOptions>,
+) -> Result<Vec<u8>, JsError> {
+    if count == 0 {
+        return Err(JsError::new("count must be at least 1"));
+    }
+    render_selected(pbn, layout, options.unwrap_or_default(), |mut boards| {
+        boards.truncate(count);
+        Ok(boards)
+    })
+}
+
+/// Render a preview of `layout`: its own [`preview_board_count`] of boards,
+/// taken from the start of the file. Show the first page of the result.
+#[wasm_bindgen(js_name = renderPreview)]
+pub fn render_preview(
+    pbn: &str,
+    layout: &str,
+    options: Option<WasmRenderOptions>,
+) -> Result<Vec<u8>, JsError> {
+    let count = preview_board_count(layout)? as usize;
+    render_first_boards(pbn, layout, count, options)
+}
+
+/// The shared body of the render entry points: parse, choose boards, render.
+fn render_selected(
+    pbn: &str,
+    layout: &str,
+    options: WasmRenderOptions,
+    choose: impl FnOnce(Vec<Board>) -> Result<Vec<Board>, JsError>,
 ) -> Result<Vec<u8>, JsError> {
     let layout = Layout::from_str(layout).map_err(|e| JsError::new(&e))?;
     let pbn_file = parse_pbn(pbn).map_err(|e| JsError::new(&e.to_string()))?;
@@ -93,6 +187,7 @@ pub fn render_pbn(
     if pbn_file.boards.is_empty() {
         return Err(JsError::new("No boards to process"));
     }
+    let boards = choose(pbn_file.boards)?;
 
     // `%` header lines carry the Bridge Composer directives (title, options,
     // margins); render_boards parses them out of the raw comment lines.
@@ -102,11 +197,6 @@ pub fn render_pbn(
         .map(String::from)
         .collect();
 
-    render_boards(
-        &pbn_file.boards,
-        &metadata_comments,
-        layout,
-        options.unwrap_or_default().into(),
-    )
-    .map_err(|e| JsError::new(&e.to_string()))
+    render_boards(&boards, &metadata_comments, layout, options.into())
+        .map_err(|e| JsError::new(&e.to_string()))
 }

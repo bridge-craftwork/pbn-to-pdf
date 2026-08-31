@@ -119,6 +119,21 @@ library and reading the page work while the wasm is still arriving. A failed
 load is deliberately *not* cached, or one flaky network leaves the page
 permanently broken.
 
+The bindings select boards two ways, and the distinction is deliberate.
+`renderPbn` honours `options.boards`, the CLI's `--boards` spec, which selects
+by `[Board]` number. `renderFirstBoards` / `renderPreview` select
+*positionally*: a sliced Baker Bridge set is renumbered from 1 per set, but an
+arbitrary PBN may be numbered from anything, and a preview must not depend on
+that.
+
+`Layout::preview_boards` (in `src/cli/args.rs`, so the CLI shares it) says how
+many boards make a representative first page. For the card-geometry layouts it
+is a real capacity, and the integration test asserts it by rendering: that many
+boards fill one page and one more spills. For `analysis` and `bidding-sheets` it
+is a *sample*, because their paging follows commentary and auction length
+respectively — consumers render the preview and show only its first page. All
+six layouts preview in ~80 ms together, against ~740 ms for one full lesson.
+
 Testing has three layers, because each misses what the others catch:
 `npm test` (vitest) covers the pure logic, `node wasm/verify.mjs` covers the
 renderer, and `npm run check:browser` drives the built site in a real Chromium
