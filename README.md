@@ -135,9 +135,33 @@ const url = URL.createObjectURL(new Blob([pdf], { type: "application/pdf" }));
 ```
 
 `layouts()` returns the layout names, which are the same strings the CLI's
-`--layout` accepts. `RenderOptions` carries the declarer's-plan card-circling
-flags. Errors (an unknown layout, a PBN with no boards) are thrown as JS
-exceptions.
+`--layout` accepts. Errors (an unknown layout, a PBN with no boards, a board
+spec that matches nothing) are thrown as JS exceptions.
+
+`RenderOptions` carries the declarer's-plan card-circling flags and `boards`,
+which takes the CLI's `--boards` syntax:
+
+```js
+const opts = new RenderOptions();
+opts.boards = "1-8";           // or "5,8,12", or a mix
+opts.circleSureWinners = true; // declarer's plan layouts only
+const pdf = renderPbn(pbnText, "declarers-plan-2up", opts);
+```
+
+`boards` selects by `[Board]` number, not by position, so a set numbered from 17
+will not respond to `"1"`.
+
+For showing what a layout looks like before committing to it, use
+`renderPreview(pbn, layout, options?)`. It renders the opening boards
+positionally — `previewBoardCount(layout)` of them, which is 1 for the 1-up
+plan, 2 for 2-up, 4 for 4-up, 6 for a dealer summary and 5 for bidding sheets —
+so the numbering does not matter. **Show the first page and discard the rest**:
+`bidding-sheets` pages by auction length and `analysis` by commentary length, so
+either can return more than one.
+
+All six layouts preview in about 80 ms together, against ~740 ms for a single
+full lesson. `renderFirstBoards(pbn, layout, count, options?)` is the same thing
+with a count you choose.
 
 After building for Node, `node wasm/verify.mjs` renders every layout and checks
 the resulting PDFs.

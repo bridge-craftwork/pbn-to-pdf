@@ -176,6 +176,30 @@ impl Layout {
         )
     }
 
+    /// Boards to render for a preview of this layout.
+    ///
+    /// Enough to make the first page representative: fewer leaves it looking
+    /// emptier than the layout really is. The consumer shows the first page and
+    /// discards any others.
+    ///
+    /// Most layouts have a fixed geometry, so this is exactly what fits. Bidding
+    /// sheets do not — how many boards land on a page depends on how long the
+    /// auctions are — so five is a good sample rather than a capacity, and the
+    /// extra pages it may produce are simply not shown.
+    ///
+    /// `preview_boards_renders_a_representative_first_page` in the integration
+    /// tests holds these to their meaning by rendering them.
+    pub fn preview_boards(&self) -> u32 {
+        match self {
+            Layout::Analysis => 1,
+            Layout::BiddingSheets => 5,
+            Layout::DeclarersPlan1up => 1,
+            Layout::DeclarersPlan2up => 2,
+            Layout::DeclarersPlan => 4,
+            Layout::DealerSummary => 6,
+        }
+    }
+
     /// Every layout, in CLI declaration order.
     pub const ALL: [Layout; 6] = [
         Layout::Analysis,

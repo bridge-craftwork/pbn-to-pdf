@@ -1774,3 +1774,140 @@ fn test_declarers_plan_does_not_embed_unused_court_art() {
         );
     }
 }
+
+/// `Layout::preview_boards` promises a first page that represents the layout.
+///
+/// For the card-geometry layouts that is checkable: exactly that many boards
+/// fill one page, and one more spills. `analysis` and `bidding-sheets` are
+/// excluded from that half because their paging is content-driven — commentary
+/// length and auction length respectively — so their counts are samples rather
+/// than capacities, and the preview shows the first page of what comes back.
+#[test]
+fn preview_boards_renders_a_representative_first_page() {
+    let content = fs::read_to_string(fixtures_path().join("Stayman.pbn")).unwrap();
+    let pbn = parse_pbn(&content).unwrap();
+    let comments: Vec<String> = content
+        .lines()
+        .filter(|l| l.starts_with('%'))
+        .map(String::from)
+        .collect();
+
+    let page_count = |boards: &[pbn_to_pdf::Board], layout: Layout| -> usize {
+        let pdf = render_boards(boards, &comments, layout, RenderOptions::default()).unwrap();
+        let text = String::from_utf8_lossy(&pdf);
+        // /Type /Page, but not the /Type /Pages node that holds them -- a plain
+        // substring count of the former silently includes every one of the latter.
+        text.match_indices("/Type")
+            .filter(|(i, _)| {
+                let rest = text[i + "/Type".len()..].trim_start();
+                rest.strip_prefix("/Page")
+                    .is_some_and(|after| !after.starts_with('s'))
+            })
+            .count()
+    };
+
+    // Boards that actually carry a deal; the fixture has placeholder entries
+    // whose hands parse to nothing.
+    let usable: Vec<pbn_to_pdf::Board> = pbn
+        .boards
+        .iter()
+        .filter(|b| b.deal.north.card_count() == 13)
+        .take(12)
+        .cloned()
+        .collect();
+    assert!(
+        usable.len() >= 8,
+        "fixture no longer has enough usable boards"
+    );
+
+    for layout in Layout::ALL {
+        let n = layout.preview_boards() as usize;
+        assert!(n >= 1, "{layout} previews zero boards");
+        assert!(
+            n <= usable.len(),
+            "{layout} previews more boards than the fixture provides"
+        );
+
+        let preview = page_count(&usable[..n], layout);
+        assert!(preview >= 1, "{layout} preview produced no pages");
+
+        // Only the card-geometry layouts have a capacity worth asserting. How
+        // many boards fit a page of `analysis` depends on how much commentary
+        // each carries, and a page of `bidding-sheets` on how long the auctions
+        // run -- for those two the count is a sample, and the preview shows the
+        // first page of whatever comes back.
+        let fixed_geometry = matches!(
+            layout,
+            Layout::DeclarersPlan
+                | Layout::DeclarersPlan1up
+                | Layout::DeclarersPlan2up
+                | Layout::DealerSummary
+        );
+        if fixed_geometry {
+            assert_eq!(preview, 1, "{layout} preview should be a single page");
+            let spilled = page_count(&usable[..n + 1], layout);
+            assert!(
+                spilled > preview,
+                "{layout} fits more than preview_boards() = {n}; the count is too low",
+            );
+        }
+    }
+}
+
+/// Running the tool twice on the same input must produce identical bytes.
+///
+/// Issue #11: the declarer's-plan layouts registered card XObjects while
+/// iterating a `HashSet`, and Rust seeds each set's hasher differently, so the
+/// objects landed in the document in a different order every run. The content
+/// was identical and the bytes were not, which rewrote 184 committed PDFs on
+/// every Baker Bridge rebuild and buried real changes in the noise.
+///
+/// Deliberately run as two processes rather than two in-process renders. A
+/// second render inside one process also varies, but for a different and
+/// external reason: printpdf tags each embedded font subset with a value drawn
+/// from an RNG, which repeats across processes and advances within one. That
+/// affects every layout, is not ours to fix, and would mask this regression
+/// behind a permanently failing assertion.
+#[test]
+fn rendering_is_byte_reproducible_across_runs() {
+    let binary = PathBuf::from(env!("CARGO_BIN_EXE_pbn-to-pdf"));
+    // A fixture whose opening boards carry full deals: the bug is in card
+    // XObject registration, so a file with placeholder boards registers nothing
+    // and the test passes whether or not the bug is present.
+    let input = fixtures_path().join("Drury.pbn");
+    let dir = output_path();
+    fs::create_dir_all(&dir).unwrap();
+
+    for layout in Layout::ALL {
+        let mut renders = Vec::new();
+        for run in 0..2 {
+            let out = dir.join(format!("repro-{layout}-{run}.pdf"));
+            let status = Command::new(&binary)
+                .args([
+                    "--layout",
+                    layout.as_str(),
+                    "--boards",
+                    "1-4",
+                    input.to_str().unwrap(),
+                    "-o",
+                    out.to_str().unwrap(),
+                ])
+                .status()
+                .expect("failed to run pbn-to-pdf");
+            assert!(status.success(), "{layout} render failed");
+            renders.push(fs::read(&out).unwrap());
+        }
+
+        assert_eq!(
+            renders[0].len(),
+            renders[1].len(),
+            "{layout} rendered {} bytes then {} -- output is not reproducible",
+            renders[0].len(),
+            renders[1].len(),
+        );
+        assert!(
+            renders[0] == renders[1],
+            "{layout} rendered the same size but different bytes -- output is not reproducible",
+        );
+    }
+}
