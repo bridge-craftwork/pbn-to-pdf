@@ -1,48 +1,44 @@
 <script setup>
 // Three ways in: the Baker Bridge library, a local file, or a URL. Emits
-// `load` with { name, text } whichever route the visitor takes.
-import { onMounted, onBeforeUnmount, ref } from 'vue'
-import { fetchCatalogue, fetchLesson, fetchPbn } from '@/lib/baker.js'
+// `load` with a source object; the library route carries one PBN per rotation,
+// the other two a single PBN used for every layout.
+import { onBeforeUnmount, onMounted, ref } from 'vue'
+import LessonPicker from '@/components/LessonPicker.vue'
+import { fetchLibrary, fetchPbn, fetchSetViews } from '@/lib/baker.js'
 
+const props = defineProps({ loadedId: { type: String, default: '' } })
 const emit = defineEmits(['load', 'error'])
 
 const tab = ref('library')
-const categories = ref([])
-const lesson = ref('')
-const catalogueError = ref('')
-const loadingCatalogue = ref(true)
-const url = ref('')
+const lessons = ref([])
+const libraryError = ref('')
+const loadingLibrary = ref(true)
 const busy = ref(false)
+const url = ref('')
 const dragging = ref(false)
 
-let controller = new AbortController()
+const controller = new AbortController()
 onBeforeUnmount(() => controller.abort())
 
 onMounted(async () => {
   try {
-    categories.value = await fetchCatalogue(controller.signal)
+    lessons.value = (await fetchLibrary(controller.signal)).lessons
   } catch (e) {
-    if (e.name !== 'AbortError') catalogueError.value = e.message
+    if (e.name !== 'AbortError') libraryError.value = e.message
   } finally {
-    loadingCatalogue.value = false
+    loadingLibrary.value = false
   }
 })
 
-const named = (id) => {
-  for (const c of categories.value) {
-    const hit = c.lessons.find((l) => l.id === id)
-    if (hit) return hit.name
-  }
-  return id
-}
-
-async function pickLesson() {
-  if (!lesson.value) return
+async function pick({ lesson, set }) {
   busy.value = true
   try {
     emit('load', {
-      name: named(lesson.value),
-      text: await fetchLesson(lesson.value, controller.signal),
+      kind: 'library',
+      id: lesson.id,
+      name: `${lesson.name} — ${set.label}`,
+      stem: `${lesson.name} ${set.label}`.replace(/[·]/g, '-'),
+      views: await fetchSetViews(set, controller.signal),
     })
   } catch (e) {
     if (e.name !== 'AbortError') emit('error', e.message)
@@ -57,7 +53,8 @@ async function loadUrl() {
   busy.value = true
   try {
     const text = await fetchPbn(target, controller.signal)
-    emit('load', { name: target.split('/').pop() || target, text })
+    const name = decodeURIComponent(target.split('/').pop() || target)
+    emit('load', { kind: 'url', id: target, name, stem: name.replace(/\.pbn$/i, ''), text })
   } catch (e) {
     if (e.name !== 'AbortError') emit('error', e.message)
   } finally {
@@ -68,7 +65,13 @@ async function loadUrl() {
 async function takeFile(file) {
   if (!file) return
   try {
-    emit('load', { name: file.name, text: await file.text() })
+    emit('load', {
+      kind: 'file',
+      id: file.name,
+      name: file.name,
+      stem: file.name.replace(/\.pbn$/i, ''),
+      text: await file.text(),
+    })
   } catch {
     emit('error', `Could not read ${file.name}.`)
   }
@@ -81,7 +84,7 @@ function onDrop(e) {
 </script>
 
 <template>
-  <div class="picker">
+  <div>
     <div class="tabs" role="tablist">
       <button
         v-for="t in ['library', 'file', 'url']"
@@ -95,27 +98,16 @@ function onDrop(e) {
       </button>
     </div>
 
-    <div v-if="tab === 'library'" class="pane">
-      <p v-if="loadingCatalogue" class="muted">Loading the lesson list…</p>
-      <p v-else-if="catalogueError" class="error">{{ catalogueError }}</p>
-      <template v-else>
-        <label for="lesson">Lesson</label>
-        <select id="lesson" v-model="lesson">
-          <option value="" disabled>Choose a lesson…</option>
-          <optgroup v-for="c in categories" :key="c.id" :label="c.name">
-            <option v-for="l in c.lessons" :key="l.id" :value="l.id">{{ l.name }}</option>
-          </optgroup>
-        </select>
-        <button class="primary" :disabled="!lesson || busy" @click="pickLesson">
-          {{ busy ? 'Loading…' : 'Load lesson' }}
-        </button>
-        <p class="muted note">
-          50 lessons from
-          <a href="https://github.com/bridge-craftwork/Baker-Bridge" target="_blank" rel="noopener">
-            Baker Bridge</a
-          >, public domain.
-        </p>
-      </template>
+    <div v-if="tab === 'library'">
+      <p v-if="loadingLibrary" class="muted">Loading the lesson library…</p>
+      <p v-else-if="libraryError" class="error">{{ libraryError }}</p>
+      <LessonPicker
+        v-else
+        :lessons="lessons"
+        :busy="busy"
+        :selected-id="loadedId"
+        @pick="pick"
+      />
     </div>
 
     <div
@@ -127,12 +119,7 @@ function onDrop(e) {
       @drop.prevent="onDrop"
     >
       <p>Drop a <code>.pbn</code> file here, or</p>
-      <input
-        id="file"
-        type="file"
-        accept=".pbn,text/plain"
-        @change="takeFile($event.target.files?.[0])"
-      />
+      <input type="file" accept=".pbn,text/plain" @change="takeFile($event.target.files?.[0])" />
       <p class="muted note">Nothing is uploaded — the file is read in this browser.</p>
     </div>
 
@@ -155,12 +142,8 @@ function onDrop(e) {
 .pane button.primary { justify-self: start; }
 .note { font-size: 0.85rem; margin: 0; }
 .drop {
-  border: 2px dashed var(--line);
-  border-radius: var(--radius);
-  padding: 1.25rem;
-  text-align: center;
-  justify-items: center;
+  border: 2px dashed var(--line); border-radius: var(--radius);
+  padding: 1.25rem; text-align: center; justify-items: center;
 }
 .drop.dragging { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, transparent); }
-a { color: var(--accent); }
 </style>

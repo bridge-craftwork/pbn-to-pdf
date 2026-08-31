@@ -114,6 +114,22 @@ A few things in `web/vite.config.js` are load-bearing rather than decorative:
   and changes rarely; app code is ~30 kB gzipped. Without the split every
   app-code deploy re-downloads the engine for everyone.
 
+The lesson library is the **Rotations** export of Baker Bridge, read from its
+`manifest.json`, not the `bridge-classroom` one. Two reasons: the app export
+carries interactive control directives that print onto a handout as "Make a
+Plan, then click NEXT", and Rotations rotates each set for a seating. The
+seating matters — `VIEW_FOR_LAYOUT` in `web/src/lib/baker.js` sends the
+declarer's plans to the `South` rotation (the student always declares), bidding
+sheets to `North-South` (declarer alternates between the partners), and the
+dealer summary and analysis to `Full Table`. So choosing a layout chooses a
+file, and one selection can span all three.
+
+The layout gallery renders a thumbnail of each layout's first page *before*
+anything is ticked, because recognising a layout is the point of showing it.
+That is affordable only because previews render a handful of opening boards
+rather than a lesson — see `Layout::preview_boards`. pdf.js rasterises page one;
+the rest is dropped.
+
 The engine is imported lazily (`web/src/lib/render.js`), so browsing the lesson
 library and reading the page work while the wasm is still arriving. A failed
 load is deliberately *not* cached, or one flaky network leaves the page

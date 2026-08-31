@@ -51,32 +51,50 @@ const check = (name, ok, detail = '') => {
 await page.goto(URL_, { waitUntil: 'networkidle', timeout: 120_000 })
 check('page loads', (await page.title()).includes('PBN to PDF'))
 
-// The example lesson arrives from Baker Bridge with no interaction.
-await page.waitForSelector('.loaded strong', { timeout: 60_000 })
-check('example lesson preloads', true, await page.textContent('.loaded strong'))
-
-// Layout options come from the engine, so their presence proves the wasm ran.
+// The library, the default lesson and every preview: nothing here is reached
+// without the manifest fetch, the wasm load and pdf.js all working.
 await page.waitForFunction(
-  () => document.querySelectorAll('#layout option').length > 1, null, { timeout: 240_000 })
-const ids = await page.$$eval('#layout option', (n) => n.map((o) => o.value))
-check('engine supplies all six layouts', ids.length === 6, ids.join(', '))
+  () => document.querySelectorAll('.gallery img').length >= 6, null, { timeout: 300_000 })
+check('every layout previews as a thumbnail', (await page.locator('.gallery img').count()) === 6)
+check('the default lesson preloads', true, await page.textContent('.loaded strong'))
+check('the library lists its lessons', (await page.locator('tbody tr:not(.group)').count()) > 40)
+check('the version reaches the footer', /v\d+\.\d+\.\d+/.test(await page.textContent('footer')))
 
-check("circle options shown for declarer's plan", (await page.locator('fieldset input').count()) === 3)
+// Filtering is why the table exists; 50 lessons is too many to scan.
+await page.fill('#lesson-filter', 'declarer')
+await page.waitForTimeout(300)
+const filtered = await page.locator('tbody tr:not(.group)').count()
+check('the filter narrows the table', filtered > 0 && filtered < 50, `${filtered} rows for "declarer"`)
+await page.fill('#lesson-filter', '')
 
-await page.click('button.primary:has-text("Render PDF")')
+// Two layouts drawn from two different rotations, bundled together.
+const tick = (name) =>
+  page.locator('.gallery li').filter({ hasText: name }).locator('input[type=checkbox]')
+await tick("Declarer's plan — 2 per page").check()
+await tick('Bidding sheets').check()
+check('circling options appear for a declarer plan',
+  (await page.locator('fieldset input').count()) === 3)
+
+await page.click('button.primary:has-text("Generate")')
 await page.waitForSelector('a.download', { timeout: 300_000 })
-const href = await page.getAttribute('a.download', 'href')
+let name = await page.getAttribute('a.download', 'download')
+const zip = await page.evaluate(async (u) => {
+  const b = await (await fetch(u)).arrayBuffer()
+  return { sig: new TextDecoder().decode(new Uint8Array(b, 0, 2)), bytes: b.byteLength }
+}, await page.getAttribute('a.download', 'href'))
+check('several layouts arrive as one zip', zip.sig === 'PK' && name.endsWith('.zip'),
+  `${name}, ${(zip.bytes / 1024) | 0} KB`)
+
+// One layout should not be wrapped in an archive.
+await tick('Bidding sheets').uncheck()
+await page.click('button.primary:has-text("Generate")')
+await page.waitForSelector('a.download', { timeout: 300_000 })
+name = await page.getAttribute('a.download', 'download')
 const pdf = await page.evaluate(async (u) => {
   const b = await (await fetch(u)).arrayBuffer()
-  return { head: new TextDecoder().decode(new Uint8Array(b, 0, 5)), bytes: b.byteLength }
-}, href)
-check('renders a real PDF', pdf.head === '%PDF-' && pdf.bytes > 10_000, `${(pdf.bytes / 1024) | 0} KB`)
-check('download has a sensible filename', /\.pdf$/.test(await page.getAttribute('a.download', 'download')))
-
-// A stale PDF under new settings is worse than none.
-await page.selectOption('#layout', 'dealer-summary')
-check('changing layout clears the result', (await page.locator('a.download').count()) === 0)
-check('circle options hidden for other layouts', (await page.locator('fieldset input').count()) === 0)
+  return new TextDecoder().decode(new Uint8Array(b, 0, 5))
+}, await page.getAttribute('a.download', 'href'))
+check('a single layout downloads as a PDF', pdf === '%PDF-' && name.endsWith('.pdf'))
 
 check('no console errors', problems.length === 0, problems.join(' | '))
 

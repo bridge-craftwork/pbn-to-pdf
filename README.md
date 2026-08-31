@@ -92,10 +92,17 @@ pbn-to-pdf hands.pbn -l bidding-sheets -t
 
 ## Web app
 
-There is a browser front-end in [`web/`](web/): choose a PBN — from the
-[Baker Bridge](https://github.com/bridge-craftwork/Baker-Bridge) lesson library,
-a local file, or a URL — pick a layout, and get a PDF. Rendering happens
-entirely in the browser through the WebAssembly build, so nothing is uploaded.
+There is a browser front-end in [`web/`](web/). Pick a lesson from the
+[Baker Bridge](https://github.com/bridge-craftwork/Baker-Bridge) library — a
+filterable table of all 50 — or open a local file or a URL. Every layout is then
+shown as a thumbnail of its own first page, so you can see what you are choosing
+rather than guess from a name. Tick as many as you want; one comes back as a
+PDF, several as a zip.
+
+Rendering happens entirely in the browser through the WebAssembly build, so
+nothing is uploaded. Library lessons are drawn from the rotation each layout
+needs: the declarer's plans from the seating where the student always declares,
+bidding sheets from the one where declarer alternates between the partners.
 
 ```bash
 cd web
