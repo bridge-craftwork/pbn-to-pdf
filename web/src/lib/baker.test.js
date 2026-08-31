@@ -41,7 +41,8 @@ describe('VIEW_FOR_LAYOUT', () => {
 })
 
 const MANIFEST = {
-  generatedAt: '2026-07-14T19:59:38Z',
+  generatedAt: '2026-08-30T20:37:38Z',
+  contentHash: '41e262a0fc4d4ca3',
   categories: [
     {
       name: '4. Declarer Play',
@@ -85,6 +86,21 @@ describe('fetchLibrary', () => {
   it('tolerates a category with no lessons', async () => {
     vi.stubGlobal('fetch', async () => ok(MANIFEST))
     await expect(fetchLibrary()).resolves.toBeTruthy()
+  })
+
+  // contentHash is what a cache would key on, so it has to survive the flatten.
+  it('carries contentHash through', async () => {
+    vi.stubGlobal('fetch', async () => ok(MANIFEST))
+    const { contentHash, generatedAt } = await fetchLibrary()
+    expect(contentHash).toBe('41e262a0fc4d4ca3')
+    expect(generatedAt).toBe('2026-08-30T20:37:38Z')
+  })
+
+  // An older manifest predates the field; its absence must not throw.
+  it('tolerates a manifest without contentHash', async () => {
+    const { contentHash, ...rest } = MANIFEST
+    vi.stubGlobal('fetch', async () => ok(rest))
+    await expect(fetchLibrary()).resolves.toMatchObject({ contentHash: undefined })
   })
 
   it('reports an HTTP failure rather than throwing on undefined', async () => {
