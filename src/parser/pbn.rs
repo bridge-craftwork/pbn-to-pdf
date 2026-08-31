@@ -113,7 +113,8 @@ fn parse_boards(lines: &[&str]) -> Result<Vec<Board>, PbnError> {
             }
 
             // Parse the tag pair
-            if let Ok((_, tag)) = parse_tag_pair(trimmed) {
+            if let Ok((rest, tag)) = parse_tag_pair(trimmed) {
+                let name = tag.name.clone();
                 process_tag(
                     &mut current_board,
                     &mut boards,
@@ -123,6 +124,28 @@ fn parse_boards(lines: &[&str]) -> Result<Vec<Board>, PbnError> {
                     &mut in_play,
                     &mut play_leader,
                 )?;
+
+                // A section's data belongs on the lines after its tag pair, but
+                // some producers write the first of it on the tag's own line --
+                // `[Play "W"]SJ`. Discarding the remainder loses exactly one
+                // datum, and for a Play section that datum is the opening lead,
+                // so the loss is silent and total. Take it, and say so.
+                let rest = rest.trim();
+                if !rest.is_empty() {
+                    if in_auction || in_play {
+                        log::warn!(
+                            "[{name}] section data on the tag line ({rest:?}); \
+                             the PBN standard puts it on the following line"
+                        );
+                        if in_auction {
+                            auction_lines.push(rest);
+                        } else {
+                            play_lines.push(rest);
+                        }
+                    } else {
+                        log::debug!("ignoring trailing text after [{name}]: {rest:?}");
+                    }
+                }
             }
         } else if trimmed.starts_with('{') {
             // Start of commentary block
@@ -452,5 +475,86 @@ mod tests {
         assert!(!board.hidden.east);
         assert!(board.hidden.south);
         assert!(!board.hidden.west);
+    }
+
+    /// Some producers write a section's first datum on the tag pair's own line
+    /// instead of the line below it. The PBN standard puts it below; accepting
+    /// it anyway costs nothing and the intent is unambiguous.
+    ///
+    /// Baker Bridge does this for every one of its Play sections, which made
+    /// every opening lead in that collection invisible — the tag parsed, the
+    /// card was discarded, and a declarer's plan rendered with no lead and no
+    /// complaint.
+    mod section_data_on_the_tag_line {
+        use super::*;
+
+        const DEAL: &str = concat!(
+            "[Board \"1\"]\n",
+            "[Dealer \"N\"]\n",
+            "[Declarer \"S\"]\n",
+            "[Contract \"3NT\"]\n",
+            "[Deal \"N:AKQ.JT9.876.5432 T98.876.5432.AKQ 7654.5432.AKQ.JT9 J32.AKQ.JT9.876\"]\n",
+        );
+
+        fn first_lead(pbn: &str) -> Option<String> {
+            let file = parse_pbn(pbn).unwrap();
+            let board = file.boards.first()?;
+            let play = board.play.as_ref()?;
+            let card = play.tricks.first()?.cards[0]?;
+            Some(format!("{:?}{:?}", card.suit, card.rank))
+        }
+
+        #[test]
+        fn a_play_card_on_the_tag_line_is_still_the_opening_lead() {
+            let inline = format!("{DEAL}[Play \"W\"]SJ\n");
+            let standard = format!("{DEAL}[Play \"W\"]\nSJ\n");
+            assert!(
+                first_lead(&inline).is_some(),
+                "inline play data was dropped"
+            );
+            assert_eq!(first_lead(&inline), first_lead(&standard));
+        }
+
+        #[test]
+        fn an_auction_call_on_the_tag_line_is_still_the_first_call() {
+            let inline = format!("{DEAL}[Auction \"N\"]1NT Pass 3NT Pass\n");
+            let standard = format!("{DEAL}[Auction \"N\"]\n1NT Pass 3NT Pass\n");
+            let calls = |p: &str| {
+                parse_pbn(p).unwrap().boards[0]
+                    .auction
+                    .as_ref()
+                    .map(|a| a.calls.len())
+            };
+            assert_eq!(calls(&inline), calls(&standard));
+            assert!(
+                calls(&inline).unwrap_or(0) >= 4,
+                "inline auction data was dropped"
+            );
+        }
+
+        /// Only a section tag opens a section, so trailing text elsewhere is not
+        /// data and must not be swept into one.
+        #[test]
+        fn trailing_text_after_an_ordinary_tag_is_ignored() {
+            // Not [Event] or [Board]: those begin a new record, which would move
+            // the play onto a second board and prove nothing.
+            let pbn = concat!(
+                "[Board \"1\"]\n",
+                "[Dealer \"N\"]\n",
+                "[Declarer \"S\"] stray words\n",
+                "[Deal \"N:AKQ.JT9.876.5432 T98.876.5432.AKQ 7654.5432.AKQ.JT9 J32.AKQ.JT9.876\"]\n",
+                "[Play \"W\"]SJ\n",
+            );
+            let file = parse_pbn(pbn).unwrap();
+            assert_eq!(file.boards.len(), 1, "stray text should not start a record");
+            assert!(first_lead(pbn).is_some());
+        }
+
+        /// The standard form must keep working exactly as before.
+        #[test]
+        fn the_standard_form_is_unaffected() {
+            let pbn = format!("{DEAL}[Play \"W\"]\nSJ H2\n");
+            assert!(first_lead(&pbn).is_some());
+        }
     }
 }

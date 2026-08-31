@@ -291,6 +291,16 @@ by geometry, so the indices have to announce themselves.
 
 ## PBN Format Notes
 
+**Section data on the tag line.** The standard puts a section's data on the
+lines *after* its tag pair, but some producers write the first datum on the tag
+line itself — `[Play "W"]SJ`. The parser accepts that and logs a warning. It
+matters because the discarded datum is the whole of a Play section: every
+opening lead in the Baker Bridge collection (6,656 of them) was silently
+invisible, and a declarer's plan rendered with no lead box and no complaint.
+Accepting is not endorsement — Baker-Bridge#42 tracks fixing the producer.
+
+
+
 Key PBN elements the parser handles:
 - Tag pairs: `[Name "Value"]`
 - Deal notation: `N:AKQ.JT9.876.5432 ...` (Spades.Hearts.Diamonds.Clubs)
