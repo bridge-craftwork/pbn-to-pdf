@@ -124,6 +124,15 @@ sheets to `North-South` (declarer alternates between the partners), and the
 dealer summary and analysis to `Full Table`. So choosing a layout chooses a
 file, and one selection can span all three.
 
+The manifest carries both `generatedAt` and `contentHash`. **Key any cache on
+`contentHash`** — a 16-hex digest of everything the manifest describes, which
+moves iff the tree moves and is identical across rebuilds of the same tree.
+`generatedAt` is pinned to the deal set so an unchanged rebuild produces an
+unchanged file, so it stands still for a packaging-only change and cannot answer
+"is my copy current?". Nothing caches today: the manifest costs 251 ms to fetch
+and 0.7 ms to parse, and raw.githubusercontent already sends `max-age=300` and a
+strong ETag.
+
 The layout gallery renders a thumbnail of each layout's first page *before*
 anything is ticked, because recognising a layout is the point of showing it.
 That is affordable only because previews render a handful of opening boards
