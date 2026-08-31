@@ -1,6 +1,6 @@
 [package]
 name = "pbn-to-pdf-wasm"
-version = "0.17.1"
+version = "0.18.0"
 edition = "2021"
 license = "Unlicense"
 description = "WebAssembly bindings for pbn-to-pdf: render PBN files to PDF in the browser"
