@@ -32,6 +32,34 @@ const NOMINAL_SUIT_LENGTH: usize = 5;
 
 /// Font size for header text (increased for visibility)
 const HEADER_FONT_SIZE: f32 = 14.0;
+/// Gap between "Deal N" and the contract that follows it.
+const DEAL_CONTRACT_GAP: f32 = 2.0;
+/// Smallest gap allowed between the contract and the right-justified goal text.
+const HEADER_MIN_GAP: f32 = 2.0;
+/// Floor on the header's autofit, as a fraction of HEADER_FONT_SIZE.
+const HEADER_MIN_SHRINK: f32 = 0.75;
+const CONTRACT_LABEL: &str = "Ctr: ";
+
+/// Font size at which the header's two ends fit `available` with `min_gap`
+/// between them, given their widths measured at `base`.
+///
+/// Text width is proportional to font size, so a single step lands on a fit.
+/// The result is floored at `HEADER_MIN_SHRINK` of `base`: a header shrunk far
+/// enough to read as a different size is worse than one that touches the edge.
+fn fit_header_font_size(
+    base: f32,
+    left_width: f32,
+    goal_width: f32,
+    min_gap: f32,
+    available: f32,
+) -> f32 {
+    let needed = left_width + min_gap + goal_width;
+    if needed > available && needed > 0.0 && available > 0.0 {
+        (base * (available / needed)).max(base * HEADER_MIN_SHRINK)
+    } else {
+        base
+    }
+}
 
 /// Height of the header line area
 const HEADER_HEIGHT: f32 = 8.0;
@@ -390,7 +418,6 @@ impl<'a> DeclarersPlanSmallRenderer<'a> {
         let s = self.layout_scale;
         let (ox, oy) = (origin.0 .0, origin.1 .0);
 
-        let header_font_size = HEADER_FONT_SIZE * s;
         let header_height = HEADER_HEIGHT * s;
         let element_gap = ELEMENT_GAP * s;
         let lead_box_font_size = LEAD_BOX_FONT_SIZE * s;
@@ -413,6 +440,37 @@ impl<'a> DeclarersPlanSmallRenderer<'a> {
         layer.set_fill_color(Color::Rgb(BLACK));
         let measurer = text_metrics::get_times_measurer();
 
+        let goal_text = if is_nt {
+            "Goal: at least ____ winners"
+        } else {
+            "Goal: at most ____ losers"
+        };
+
+        // The header puts "Deal N  Ctr: X" on the left and the goal on the
+        // right, both on one line no wider than the dummy diagram. Nothing
+        // stopped the two from meeting: a wide contract and the longer goal
+        // wording ran together as "6NTGoal: ...". Measure both ends first and
+        // shrink the line just enough to keep a gap between them.
+        let header_font_size = {
+            let base = HEADER_FONT_SIZE * s;
+            let mut left = 0.0;
+            if let Some(deal_num) = deal_number {
+                left += measurer.measure_width_mm(&format!("Deal {}", deal_num), base)
+                    + DEAL_CONTRACT_GAP * s;
+            }
+            if let Some(contract) = contract_str {
+                left += measurer.measure_width_mm(CONTRACT_LABEL, base)
+                    + measurer.measure_width_mm(contract, base);
+            }
+            fit_header_font_size(
+                base,
+                left,
+                measurer.measure_width_mm(goal_text, base),
+                HEADER_MIN_GAP * s,
+                right_edge - content_x,
+            )
+        };
+
         // Left: "Deal #" followed by "Ctr: xx"
         let mut text_x = content_x;
         if let Some(deal_num) = deal_number {
@@ -425,12 +483,12 @@ impl<'a> DeclarersPlanSmallRenderer<'a> {
                 Mm(header_y),
                 self.bold_font,
             );
-            text_x += deal_width + 2.0 * s; // Gap between deal and contract
+            text_x += deal_width + DEAL_CONTRACT_GAP * s;
         }
 
         // Contract right after deal number (abbreviated)
         if let Some(contract) = contract_str {
-            let label = "Ctr: ";
+            let label = CONTRACT_LABEL;
             let label_width = measurer.measure_width_mm(label, header_font_size);
             layer.set_fill_color(Color::Rgb(BLACK));
             layer.use_text_builtin(label, header_font_size, Mm(text_x), Mm(header_y), self.font);
@@ -449,11 +507,6 @@ impl<'a> DeclarersPlanSmallRenderer<'a> {
 
         // Right: Goal text (right-justified)
         layer.set_fill_color(Color::Rgb(BLACK));
-        let goal_text = if is_nt {
-            "Goal: at least ____ winners"
-        } else {
-            "Goal: at most ____ losers"
-        };
         let goal_width = measurer.measure_width_mm(goal_text, header_font_size);
         let goal_x = right_edge - goal_width;
         layer.use_text_builtin(
@@ -630,5 +683,110 @@ impl<'a> DeclarersPlanSmallRenderer<'a> {
             Mm(text_y),
             self.bold_font,
         );
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::render::helpers::text_metrics;
+
+    /// The header line as it is actually assembled: "Deal N" + gap + "Ctr: " +
+    /// the contract on the left, the goal right-justified.
+    fn header_fits(contract: &str, is_nt: bool, available: f32, scale: f32) -> bool {
+        let m = text_metrics::get_times_measurer();
+        let base = HEADER_FONT_SIZE * scale;
+        let goal = if is_nt {
+            "Goal: at least ____ winners"
+        } else {
+            "Goal: at most ____ losers"
+        };
+        let left = m.measure_width_mm("Deal 8", base)
+            + DEAL_CONTRACT_GAP * scale
+            + m.measure_width_mm(CONTRACT_LABEL, base)
+            + m.measure_width_mm(contract, base);
+        let goal_width = m.measure_width_mm(goal, base);
+        let min_gap = HEADER_MIN_GAP * scale;
+
+        let fitted = fit_header_font_size(base, left, goal_width, min_gap, available);
+        // Widths scale with the font size, so re-scale rather than re-measure.
+        let k = fitted / base;
+        (left + min_gap + goal_width) * k <= available + 0.01
+    }
+
+    /// (layout_scale, width available to the header) as the three declarer's
+    /// plan layouts actually call this, measured from a real render.
+    const REAL_GEOMETRY: [(f32, f32); 3] = [
+        (1.0, 88.5),        // declarers-plan (4-up)
+        (1.2857143, 112.1), // declarers-plan-2up
+        (1.5714287, 135.7), // declarers-plan-1up
+    ];
+
+    #[test]
+    fn leaves_a_gap_between_the_contract_and_the_goal() {
+        // Regression: a notrump contract is the widest ("6NT" against "6♥"), and
+        // it pairs with the longer goal wording. The two ends were positioned
+        // independently, which ran them together as "6NTGoal: at least ...".
+        for (scale, available) in REAL_GEOMETRY {
+            for (contract, is_nt) in [
+                ("6NT", true),
+                ("7NT", true),
+                ("6\u{2665}", false),
+                ("1\u{2660}", false),
+            ] {
+                assert!(
+                    header_fits(contract, is_nt, available, scale),
+                    "{contract} at scale {scale} in {available}mm overruns the goal text",
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn the_real_layouts_barely_need_shrinking() {
+        // The autofit is a safety net, not a design element: if a change makes
+        // it work hard, the header has outgrown its panel and the fix belongs
+        // in the layout rather than in a smaller font.
+        let m = text_metrics::get_times_measurer();
+        for (scale, available) in REAL_GEOMETRY {
+            let base = HEADER_FONT_SIZE * scale;
+            let left = m.measure_width_mm("Deal 8", base)
+                + DEAL_CONTRACT_GAP * scale
+                + m.measure_width_mm(CONTRACT_LABEL, base)
+                + m.measure_width_mm("7NT", base);
+            let goal = m.measure_width_mm("Goal: at least ____ winners", base);
+            let fitted = fit_header_font_size(base, left, goal, HEADER_MIN_GAP * scale, available);
+            let ratio = fitted / base;
+            assert!(
+                ratio > 0.9,
+                "scale {scale} shrinks the header to {:.0}% -- the panel is too narrow for it",
+                ratio * 100.0,
+            );
+        }
+    }
+
+    #[test]
+    fn does_not_shrink_a_header_that_already_fits() {
+        let base = 14.0;
+        assert_eq!(fit_header_font_size(base, 20.0, 30.0, 2.0, 100.0), base);
+        // Exactly touching the limit still counts as fitting.
+        assert_eq!(fit_header_font_size(base, 20.0, 30.0, 2.0, 52.0), base);
+    }
+
+    #[test]
+    fn shrinks_only_as_far_as_the_floor() {
+        let base = 14.0;
+        // Wildly too narrow: clamped rather than reduced to something unreadable.
+        let fitted = fit_header_font_size(base, 200.0, 300.0, 2.0, 10.0);
+        assert!(
+            (fitted - base * HEADER_MIN_SHRINK).abs() < 1e-6,
+            "got {fitted}"
+        );
+    }
+
+    #[test]
+    fn a_zero_width_panel_does_not_produce_a_nonsense_size() {
+        let fitted = fit_header_font_size(14.0, 20.0, 30.0, 2.0, 0.0);
+        assert!(fitted.is_finite() && fitted > 0.0, "got {fitted}");
     }
 }
