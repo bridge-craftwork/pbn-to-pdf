@@ -215,6 +215,26 @@ Integration tests generate PDFs in `tests/output/` for visual verification:
 - `fan_test.pdf` - Fan renderer test
 - `full_deck_compass.pdf` - Full 52-card compass layout
 
+## Reproducible output
+
+Rendering the same input twice must produce the same bytes: Baker Bridge commits
+its packaged PDFs, and non-determinism rewrites 184 files on every rebuild for no
+content change. `rendering_is_byte_reproducible_across_runs` guards this for all
+six layouts.
+
+Anything that reaches the PDF in iteration order has to be ordered deliberately.
+`CardAssets::load_faces` sorts before registering XObjects because a `HashSet`'s
+iteration order is seeded per set (issue #11) — that was the whole of the bug,
+and it showed only in the declarer's-plan layouts because they are the only ones
+that embed card faces.
+
+One caveat, and it is printpdf's rather than ours: each embedded font subset gets
+a tag drawn from an RNG that resets per process and advances within one. So the
+*Nth* render of a process always matches the Nth render of any other process —
+a build doing the same sequence of renders is reproducible — but two renders of
+the same input inside one process differ in that tag. That is why the test runs
+the binary twice instead of calling `render_boards` twice.
+
 ## Card asset pipeline
 
 `assets/cards/*.svg` are the 52 base cards; `assets/cards/variants/` holds the

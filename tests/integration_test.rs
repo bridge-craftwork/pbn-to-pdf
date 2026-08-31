@@ -1853,3 +1853,61 @@ fn preview_boards_renders_a_representative_first_page() {
         }
     }
 }
+
+/// Running the tool twice on the same input must produce identical bytes.
+///
+/// Issue #11: the declarer's-plan layouts registered card XObjects while
+/// iterating a `HashSet`, and Rust seeds each set's hasher differently, so the
+/// objects landed in the document in a different order every run. The content
+/// was identical and the bytes were not, which rewrote 184 committed PDFs on
+/// every Baker Bridge rebuild and buried real changes in the noise.
+///
+/// Deliberately run as two processes rather than two in-process renders. A
+/// second render inside one process also varies, but for a different and
+/// external reason: printpdf tags each embedded font subset with a value drawn
+/// from an RNG, which repeats across processes and advances within one. That
+/// affects every layout, is not ours to fix, and would mask this regression
+/// behind a permanently failing assertion.
+#[test]
+fn rendering_is_byte_reproducible_across_runs() {
+    let binary = PathBuf::from(env!("CARGO_BIN_EXE_pbn-to-pdf"));
+    // A fixture whose opening boards carry full deals: the bug is in card
+    // XObject registration, so a file with placeholder boards registers nothing
+    // and the test passes whether or not the bug is present.
+    let input = fixtures_path().join("Drury.pbn");
+    let dir = output_path();
+    fs::create_dir_all(&dir).unwrap();
+
+    for layout in Layout::ALL {
+        let mut renders = Vec::new();
+        for run in 0..2 {
+            let out = dir.join(format!("repro-{layout}-{run}.pdf"));
+            let status = Command::new(&binary)
+                .args([
+                    "--layout",
+                    layout.as_str(),
+                    "--boards",
+                    "1-4",
+                    input.to_str().unwrap(),
+                    "-o",
+                    out.to_str().unwrap(),
+                ])
+                .status()
+                .expect("failed to run pbn-to-pdf");
+            assert!(status.success(), "{layout} render failed");
+            renders.push(fs::read(&out).unwrap());
+        }
+
+        assert_eq!(
+            renders[0].len(),
+            renders[1].len(),
+            "{layout} rendered {} bytes then {} -- output is not reproducible",
+            renders[0].len(),
+            renders[1].len(),
+        );
+        assert!(
+            renders[0] == renders[1],
+            "{layout} rendered the same size but different bytes -- output is not reproducible",
+        );
+    }
+}
