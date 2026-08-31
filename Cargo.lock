@@ -1638,7 +1638,7 @@ dependencies = [
 
 [[package]]
 name = "pbn-to-pdf"
-version = "0.17.1"
+version = "0.18.0"
 dependencies = [
  "anyhow",
  "bridge-types",
