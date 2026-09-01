@@ -66,6 +66,8 @@ export async function fetchLibrary(signal) {
         sets.push({
           id: 'all',
           label: `All ${lesson.all.boards ?? lesson.boards} boards`,
+          // `short` is what a chip shows once its group is already labelled.
+          short: 'All',
           boards: lesson.all.boards ?? lesson.boards,
           views: lesson.all.views,
         })
@@ -76,6 +78,7 @@ export async function fetchLibrary(signal) {
             id: `${size.size}-${set.set}`,
             label: `${size.size}-board · set ${set.set}`,
             group: `${size.size}-board sets`,
+            short: String(set.set),
             boards: set.boards,
             views: set.views,
           })
