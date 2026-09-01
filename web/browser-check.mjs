@@ -57,8 +57,14 @@ await page.waitForFunction(
   () => document.querySelectorAll('.gallery img').length >= 6, null, { timeout: 300_000 })
 check('every layout previews as a thumbnail', (await page.locator('.gallery img').count()) === 6)
 check('the default lesson preloads', true, await page.textContent('.loaded strong'))
-check('the library lists its lessons', (await page.locator('tbody tr:not(.group)').count()) > 40)
 check('the version reaches the footer', /v\d+\.\d+\.\d+/.test(await page.textContent('footer')))
+
+// The library is a modal now, so the page itself carries no lesson table.
+check('the lesson table stays out of the page',
+  (await page.locator('tbody tr:not(.group)').count()) === 0)
+await page.click('button:has-text("Baker Bridge library")')
+await page.waitForSelector('dialog[open] #lesson-filter', { timeout: 10_000 })
+check('the library lists its lessons', (await page.locator('tbody tr:not(.group)').count()) > 40)
 
 // Filtering is why the table exists; 50 lessons is too many to scan.
 await page.fill('#lesson-filter', 'declarer')
@@ -67,11 +73,46 @@ const filtered = await page.locator('tbody tr:not(.group)').count()
 check('the filter narrows the table', filtered > 0 && filtered < 50, `${filtered} rows for "declarer"`)
 await page.fill('#lesson-filter', '')
 
+// Sets are chips above the table, not a <select> below it: macOS draws a
+// native pulldown of 25 sets as a full-screen list, and below 50 rows of
+// scrolling the chooser was the hardest thing in the modal to reach.
+check('the set chooser carries no native pulldown',
+  (await page.locator('dialog[open] select').count()) === 0)
+check('the set chooser sits above the lesson table',
+  await page.evaluate(() => {
+    const sets = document.querySelector('dialog[open] .sets')
+    const table = document.querySelector('dialog[open] .tablewrap')
+    return !!sets && !!table &&
+      (sets.compareDocumentPosition(table) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0
+  }))
+check('the loaded set is the one shown as chosen',
+  (await page.locator('dialog[open] .chip.on').textContent()).trim() === '1')
+
+// Choosing a different slice of the same lesson, and loading it.
+await page.locator('dialog[open] .chips .chip', { hasText: /^2$/ }).first().click()
+await page.click('dialog[open] button:has-text("Load")')
+await page.waitForSelector('dialog[open]', { state: 'detached', timeout: 30_000 })
+check('a set chip loads that set', (await page.textContent('.loaded')).includes('set 2'))
+check('closing the library leaves the page scroll-free',
+  (await page.locator('dialog[open]').count()) === 0)
+
+// Reloading redraws every preview; wait for them before ticking anything.
+await page.waitForFunction(
+  () => document.querySelectorAll('.gallery img').length >= 6, null, { timeout: 300_000 })
+
 // Two layouts drawn from two different rotations, bundled together.
 const tick = (name) =>
   page.locator('.gallery li').filter({ hasText: name }).locator('input[type=checkbox]')
 await tick("Declarer's plan — 2 per page").check()
 await tick('Bidding sheets').check()
+check('the header counts what is ticked', (await page.textContent('.count')).includes('2'))
+
+// A thumbnail on a six-across row is unreadably small; clicking one enlarges it.
+await page.locator('.gallery .shot').first().click()
+await page.waitForSelector('dialog[open] iframe', { timeout: 60_000 })
+check('a preview enlarges into a modal', true)
+await page.keyboard.press('Escape')
+await page.waitForSelector('dialog[open]', { state: 'detached', timeout: 10_000 })
 check('circling options appear for a declarer plan',
   (await page.locator('fieldset input').count()) === 3)
 

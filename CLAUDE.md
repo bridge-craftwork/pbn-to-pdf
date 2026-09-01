@@ -139,6 +139,26 @@ That is affordable only because previews render a handful of opening boards
 rather than a lesson — see `Layout::preview_boards`. pdf.js rasterises page one;
 the rest is dropped.
 
+The page is laid out so the generated PDF is visible without scrolling. That is
+what drives three choices that would otherwise look arbitrary. The lesson
+library and the enlarged previews are `<dialog>` modals, not page sections: both
+are big, both are consulted briefly, and on the page they pushed the result
+below the fold *and* put a scroll region inside a scroll region. All six layouts
+sit on one row, which makes each thumbnail too small to read a diagram in —
+hence clicking one, which re-renders that preview into a modal PDF viewer rather
+than upscaling the thumbnail (one preview is a few milliseconds, against holding
+six PDFs in memory on the chance of a click). And the lesson filter is
+`type=text`: Chrome's search field swallows Escape to clear itself, and Escape
+has to close the modal.
+
+Inside the library modal the set chooser sits *above* the lesson table and is a
+strip of chips, not a `<select>`. Below the table it was past 50 rows of
+scrolling — the thing you reopened the library to change was the hardest thing
+in it to reach — and macOS draws a native pulldown of a 100-board lesson's 63
+sets as a list across the whole screen. The chips carry `set.short` from
+`fetchLibrary`, one row per set size with the size labels aligned in their own
+column, because at 25 chips the strip wraps.
+
 The engine is imported lazily (`web/src/lib/render.js`), so browsing the lesson
 library and reading the page work while the wasm is still arriving. A failed
 load is deliberately *not* cached, or one flaky network leaves the page

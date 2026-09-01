@@ -54,7 +54,20 @@ button.primary {
   font-weight: 600;
 }
 
-select, input[type='url'], input[type='text'] {
+label { display: block; font-weight: 600; margin-bottom: 0.35rem; }
+.muted { color: var(--muted); }
+.error {
+  color: var(--danger);
+  border: 1px solid currentColor;
+  border-radius: var(--radius);
+  padding: 0.6rem 0.75rem;
+  background: color-mix(in srgb, currentColor 8%, transparent);
+}
+
+select,
+input[type='url'],
+input[type='text'],
+input[type='search'] {
   font: inherit;
   color: var(--ink);
   background: var(--panel);
@@ -64,12 +77,57 @@ select, input[type='url'], input[type='text'] {
   width: 100%;
 }
 
-label { display: block; font-weight: 600; margin-bottom: 0.35rem; }
-.muted { color: var(--muted); }
-.error {
-  color: var(--danger);
-  border: 1px solid currentColor;
+button.ghost {
+  border-color: transparent;
+  background: transparent;
+  padding: 0.25rem 0.5rem;
+  line-height: 1;
+}
+
+/* Modals.
+ *
+ * The lesson table and the enlarged previews live here rather than in the page:
+ * both are big, both are consulted briefly, and leaving them on the page pushed
+ * the generated PDF below the fold. A dialog also confines the scrolling — the
+ * page itself no longer carries a scroll region inside a scroll region. */
+dialog.modal {
+  position: fixed;
+  margin: auto;
+  width: min(34rem, 94vw);
+  max-height: 90vh;
+  padding: 0;
+  border: 1px solid var(--line);
   border-radius: var(--radius);
+  background: var(--panel);
+  color: var(--ink);
+  box-shadow: 0 12px 40px rgb(0 0 0 / 35%);
+  overflow: hidden;
+}
+dialog.modal.wide { width: min(60rem, 94vw); }
+dialog.modal.tall { height: 90vh; }
+dialog.modal[open] { display: flex; flex-direction: column; }
+dialog.modal::backdrop { background: rgb(0 0 0 / 45%); }
+
+.modalhead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
   padding: 0.6rem 0.75rem;
-  background: color-mix(in srgb, currentColor 8%, transparent);
+  border-bottom: 1px solid var(--line);
+}
+.modalhead h3 { margin: 0; font-size: 1rem; }
+
+.modalbody {
+  padding: 0.75rem;
+  overflow: auto;
+  flex: 1;
+  min-height: 0;
+}
+/* For a body whose own child does the scrolling (the lesson table, a preview
+ * iframe): the dialog must not add a second scrollbar around it. */
+.modalbody.fill {
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
