@@ -1,8 +1,8 @@
-use super::auction::{Auction, Contract};
+use super::auction::{Auction, FinalContract};
 use super::bcflags::BCFlags;
 use super::commentary::CommentaryBlock;
 use super::deal::{Deal, Direction};
-use super::play::PlaySequence;
+use bridge_types::PlaySequence;
 
 // Re-export types from bridge-types
 pub use bridge_types::{PlayerNames, Vulnerability};
@@ -69,7 +69,7 @@ pub struct Board {
 
     // Bidding
     pub auction: Option<Auction>,
-    pub contract: Option<Contract>,
+    pub contract: Option<FinalContract>,
     pub declarer: Option<Direction>,
 
     // Play

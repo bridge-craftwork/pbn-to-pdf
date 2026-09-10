@@ -55,7 +55,7 @@ fn prepare_board(board: &Board) -> PreparedBoard<'_> {
     let is_nt = board
         .contract
         .as_ref()
-        .map(|c| c.suit == BidSuit::NoTrump)
+        .map(|c| c.strain == BidSuit::NoTrump)
         .unwrap_or(false);
 
     let opening_lead = board
@@ -64,7 +64,7 @@ fn prepare_board(board: &Board) -> PreparedBoard<'_> {
         .and_then(|play| play.tricks.first().and_then(|trick| trick.cards[0]));
 
     let contract_str = board.contract.as_ref().map(|c| {
-        let suit_symbol = match c.suit {
+        let suit_symbol = match c.strain {
             BidSuit::Clubs => "♣",
             BidSuit::Diamonds => "♦",
             BidSuit::Hearts => "♥",
@@ -81,7 +81,7 @@ fn prepare_board(board: &Board) -> PreparedBoard<'_> {
         .unwrap_or(Direction::South);
     let (dummy_hand, declarer_hand) = rotate_deal_for_declarer(&board.deal, declarer);
 
-    let trump = board.contract.as_ref().map(|c| c.suit);
+    let trump = board.contract.as_ref().map(|c| c.strain);
 
     PreparedBoard {
         dummy_hand,

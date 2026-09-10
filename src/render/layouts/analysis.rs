@@ -1,7 +1,7 @@
 use crate::config::Settings;
 use crate::error::RenderError;
 use crate::model::card::RankExt;
-use crate::model::{BidSuit, Board, Direction, Suit, SUITS_DISPLAY_ORDER};
+use crate::model::{AuctionExt, BidSuit, Board, Direction, Suit, SUITS_DISPLAY_ORDER};
 use printpdf::{
     BuiltinFont, Color, FontId, Mm, PaintMode, PdfDocument, PdfPage, PdfSaveOptions, Rgb,
 };
@@ -2046,7 +2046,7 @@ impl DocumentRenderer {
     fn render_contract(
         &self,
         layer: &mut LayerBuilder,
-        contract: &crate::model::Contract,
+        contract: &crate::model::FinalContract,
         x: Mm,
         y: Mm,
         text_font: BuiltinFont,
@@ -2064,7 +2064,7 @@ impl DocumentRenderer {
         current_x += measurer.measure_width_mm(&level_str, font_size);
 
         // Render suit symbol (or NT)
-        let (symbol, use_symbol_font) = match contract.suit {
+        let (symbol, use_symbol_font) = match contract.strain {
             BidSuit::Clubs => ("♣", true),
             BidSuit::Diamonds => ("♦", true),
             BidSuit::Hearts => ("♥", true),
@@ -2072,7 +2072,7 @@ impl DocumentRenderer {
             BidSuit::NoTrump => ("NT", false),
         };
 
-        if contract.suit.is_red() {
+        if contract.strain.is_red() {
             layer.set_fill_color(Color::Rgb(colors.hearts.clone()));
         } else {
             layer.set_fill_color(Color::Rgb(BLACK));

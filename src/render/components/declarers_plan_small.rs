@@ -356,7 +356,7 @@ impl<'a> DeclarersPlanSmallRenderer<'a> {
         let is_nt = board
             .contract
             .as_ref()
-            .map(|c| c.suit == crate::model::BidSuit::NoTrump)
+            .map(|c| c.strain == crate::model::BidSuit::NoTrump)
             .unwrap_or(false);
 
         // Get opening lead if play sequence exists
