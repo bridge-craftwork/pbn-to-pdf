@@ -20,6 +20,7 @@ anyhow = "1.0"
 log = "0.4"
 env_logger = { version = "0.11", optional = true }
 bridge-types = { git = "https://github.com/bridge-craftwork/bridge-types" }
+bridge-encodings = { git = "https://github.com/bridge-craftwork/bridge-encodings" }
 lopdf = "0.35"  # PDF post-processing for compression
 
 [[bin]]
