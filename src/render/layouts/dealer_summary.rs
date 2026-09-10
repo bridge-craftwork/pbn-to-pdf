@@ -240,14 +240,14 @@ impl DealerSummaryRenderer {
             contract_x += measurer.measure_width_mm(&level_str, font_size);
 
             // Suit symbol (colored) - use symbol font for suits, builtin for NT
-            let suit_color = if contract.suit.is_red() {
+            let suit_color = if contract.strain.is_red() {
                 colors.hearts.clone()
             } else {
                 BLACK
             };
             layer.set_fill_color(Color::Rgb(suit_color));
-            let suit_str = contract.suit.symbol();
-            if contract.suit == crate::model::BidSuit::NoTrump {
+            let suit_str = contract.strain.symbol();
+            if contract.strain == crate::model::BidSuit::NoTrump {
                 layer.use_text_builtin(
                     suit_str,
                     font_size,

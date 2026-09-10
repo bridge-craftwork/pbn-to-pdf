@@ -1021,7 +1021,7 @@ impl BiddingSheetsRenderer {
                 contract_x += measurer.measure_width_mm(&level_str, font_size);
 
                 // Suit symbol
-                let symbol = match contract.suit {
+                let symbol = match contract.strain {
                     BidSuit::Clubs => "\u{2663}",
                     BidSuit::Diamonds => "\u{2666}",
                     BidSuit::Hearts => "\u{2665}",
@@ -1029,13 +1029,13 @@ impl BiddingSheetsRenderer {
                     BidSuit::NoTrump => "NT",
                 };
 
-                if contract.suit.is_red() {
+                if contract.strain.is_red() {
                     layer.set_fill_color(Color::Rgb(colors.hearts.clone()));
                 } else {
                     layer.set_fill_color(Color::Rgb(BLACK));
                 }
 
-                if contract.suit == BidSuit::NoTrump {
+                if contract.strain == BidSuit::NoTrump {
                     layer.use_text_builtin(
                         symbol,
                         font_size,

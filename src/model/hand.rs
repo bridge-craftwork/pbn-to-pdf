@@ -1,3 +1,16 @@
+//! A hand as a page shows it: four suits, each in display order.
+//!
+//! This is deliberately not `bridge_types::Hand`, and the difference is the
+//! point. That one is the deal — a flat set of thirteen cards, the right shape
+//! for dealing, solving and scoring. This one is a *view* of it, built once per
+//! board by the parser and read by every diagram, fan and dummy layout, all of
+//! which walk suits and then ranks in display order.
+//!
+//! Holding it as a view rather than a second source of truth is what keeps the
+//! two from drifting: nothing constructs a `Hand` here except from a
+//! `bridge_types::Hand`. Deriving the suits on each access instead would rebuild
+//! them per call and hand back a temporary where the renderer wants a borrow.
+
 use std::fmt;
 
 use super::card::{rank_display_cmp, Rank, RankExt, Suit, SUITS_DISPLAY_ORDER};

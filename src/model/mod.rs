@@ -7,10 +7,9 @@ pub mod commentary;
 pub mod deal;
 pub mod hand;
 pub mod metadata;
-pub mod play;
 
 pub use auction::{
-    AnnotatedCall, Auction, BidSuit, Call, CallExt, Contract, FinalContract, Strain,
+    AnnotatedCall, Auction, AuctionExt, BidSuit, Call, CallExt, FinalContract, Strain,
 };
 pub use bcflags::BCFlags;
 pub use board::{Board, HiddenHands, PlayerNames, Vulnerability};
@@ -19,4 +18,6 @@ pub use commentary::{CommentaryBlock, FormattedText, TextSpan};
 pub use deal::{Deal, Direction, DirectionExt};
 pub use hand::{Hand, Holding};
 pub use metadata::{FontSettings, FontSpec, PbnMetadata};
-pub use play::{PlaySequence, Trick};
+// The play sequence is bridge-types' as it stands: the renderer reads only
+// `tricks` and each trick's `cards`, and those are the same fields there.
+pub use bridge_types::{PlaySequence, Trick};

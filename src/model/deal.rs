@@ -1,3 +1,9 @@
+//! Four hands as a page shows them.
+//!
+//! [`Deal`] stays local for the same reason [`super::hand::Hand`] does: it is
+//! the display view's container, and a `bridge_types::Deal` holds
+//! `bridge_types::Hand`s. The two travel together or not at all.
+
 use super::card::{Suit, SUITS_DISPLAY_ORDER};
 use super::hand::Hand;
 

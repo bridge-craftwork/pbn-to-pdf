@@ -1,5 +1,7 @@
 use crate::config::Settings;
-use crate::model::{AnnotatedCall, Auction, BidSuit, Call, Direction, DirectionExt, PlayerNames};
+use crate::model::{
+    AnnotatedCall, Auction, AuctionExt, BidSuit, Call, Direction, DirectionExt, PlayerNames,
+};
 use crate::parser::replace_suit_escapes;
 use printpdf::{BuiltinFont, Color, FontId, Mm};
 

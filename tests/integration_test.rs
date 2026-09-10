@@ -7,6 +7,7 @@ use pbn_to_pdf::config::Settings;
 use pbn_to_pdf::model::analysis::{
     find_length_winners, find_promotable_winners, find_sure_winners,
 };
+use pbn_to_pdf::model::AuctionExt;
 use pbn_to_pdf::model::{BidSuit, Card, Direction, Hand, Holding, Rank, Suit};
 use pbn_to_pdf::parser::parse_pbn;
 use pbn_to_pdf::render::components::{
@@ -166,7 +167,7 @@ fn test_auction_parsing() {
             // Should be able to determine final contract
             let contract = auction.final_contract();
             assert!(
-                contract.is_some() || auction.is_passed_out,
+                contract.is_some() || auction.is_passed_out(),
                 "Board {} should have contract or be passed out",
                 board.number.unwrap_or(0)
             );
@@ -1074,7 +1075,7 @@ fn test_declarers_plan_with_sure_winners() {
         let is_nt = board
             .contract
             .as_ref()
-            .map(|c| c.suit == BidSuit::NoTrump)
+            .map(|c| c.strain == BidSuit::NoTrump)
             .unwrap_or(false);
 
         // Get opening lead if play sequence exists
@@ -1085,7 +1086,7 @@ fn test_declarers_plan_with_sure_winners() {
 
         // Format contract string
         let contract_str = board.contract.as_ref().map(|c| {
-            let suit_symbol = match c.suit {
+            let suit_symbol = match c.strain {
                 BidSuit::Clubs => "♣",
                 BidSuit::Diamonds => "♦",
                 BidSuit::Hearts => "♥",
@@ -1096,7 +1097,7 @@ fn test_declarers_plan_with_sure_winners() {
         });
 
         // Get trump suit for suit ordering
-        let trump = board.contract.as_ref().map(|c| c.suit);
+        let trump = board.contract.as_ref().map(|c| c.strain);
 
         // Create renderer with circled cards
         let renderer = DeclarersPlanSmallRenderer::new(
@@ -1248,7 +1249,7 @@ fn test_declarers_plan_with_promotable_winners() {
         let is_nt = board
             .contract
             .as_ref()
-            .map(|c| c.suit == BidSuit::NoTrump)
+            .map(|c| c.strain == BidSuit::NoTrump)
             .unwrap_or(false);
 
         // Get opening lead if play sequence exists
@@ -1259,7 +1260,7 @@ fn test_declarers_plan_with_promotable_winners() {
 
         // Format contract string
         let contract_str = board.contract.as_ref().map(|c| {
-            let suit_symbol = match c.suit {
+            let suit_symbol = match c.strain {
                 BidSuit::Clubs => "♣",
                 BidSuit::Diamonds => "♦",
                 BidSuit::Hearts => "♥",
@@ -1270,7 +1271,7 @@ fn test_declarers_plan_with_promotable_winners() {
         });
 
         // Get trump suit for suit ordering
-        let trump = board.contract.as_ref().map(|c| c.suit);
+        let trump = board.contract.as_ref().map(|c| c.strain);
 
         // Create renderer with circled cards
         let renderer = DeclarersPlanSmallRenderer::new(
@@ -1438,7 +1439,7 @@ fn test_declarers_plan_with_length_winners() {
         let is_nt = board
             .contract
             .as_ref()
-            .map(|c| c.suit == BidSuit::NoTrump)
+            .map(|c| c.strain == BidSuit::NoTrump)
             .unwrap_or(false);
 
         // Get opening lead if play sequence exists
@@ -1449,7 +1450,7 @@ fn test_declarers_plan_with_length_winners() {
 
         // Format contract string
         let contract_str = board.contract.as_ref().map(|c| {
-            let suit_symbol = match c.suit {
+            let suit_symbol = match c.strain {
                 BidSuit::Clubs => "♣",
                 BidSuit::Diamonds => "♦",
                 BidSuit::Hearts => "♥",
@@ -1460,7 +1461,7 @@ fn test_declarers_plan_with_length_winners() {
         });
 
         // Get trump suit for suit ordering
-        let trump = board.contract.as_ref().map(|c| c.suit);
+        let trump = board.contract.as_ref().map(|c| c.strain);
 
         // Create renderer with circled cards
         let renderer = DeclarersPlanSmallRenderer::new(
