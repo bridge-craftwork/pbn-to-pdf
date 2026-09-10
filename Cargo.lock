@@ -298,9 +298,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "bridge-encodings"
+version = "0.1.0"
+source = "git+https://github.com/bridge-craftwork/bridge-encodings#a7efc04b0fb5d4d6859e52419b0681c16627c7b8"
+dependencies = [
+ "bridge-types",
+ "thiserror",
+]
+
+[[package]]
 name = "bridge-types"
 version = "0.1.0"
-source = "git+https://github.com/bridge-craftwork/bridge-types#3b26da0c6b2e1f084b0e0b55796f3f19d02947fd"
+source = "git+https://github.com/bridge-craftwork/bridge-types#b9e675bbd90c5312f096931eaeb87d260f2a9314"
 
 [[package]]
 name = "brotli-decompressor"
@@ -1641,6 +1650,7 @@ name = "pbn-to-pdf"
 version = "0.18.0"
 dependencies = [
  "anyhow",
+ "bridge-encodings",
  "bridge-types",
  "clap",
  "env_logger",
