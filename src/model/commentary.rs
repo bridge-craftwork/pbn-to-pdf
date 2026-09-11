@@ -127,14 +127,38 @@ impl FormattedText {
     }
 }
 
+/// Which part of its board a commentary block belongs to, decided by where it
+/// stood among the record's tags.
+///
+/// This is Bridge Composer's reading, measured against 5.118.2: it shows each
+/// slot under its own `BCFlags` bit and, in Center mode, in its own place.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum CommentarySlot {
+    /// Before `[Board]`: the event commentary, drawn above the board (0x20).
+    Event,
+    /// Between `[Board]` and `[Deal]`, which Bridge Composer never prints.
+    BeforeDeal,
+    /// Straight after `[Deal]`: drawn under the diagram, above the auction
+    /// (0x40).
+    Diagram,
+    /// After any later tag: drawn last, under the auction (0x04). Also where a
+    /// block of unknown position goes.
+    #[default]
+    Final,
+}
+
 #[derive(Debug, Clone)]
 pub struct CommentaryBlock {
     pub content: FormattedText,
+    pub slot: CommentarySlot,
 }
 
 impl CommentaryBlock {
     pub fn new(content: FormattedText) -> Self {
-        Self { content }
+        Self {
+            content,
+            slot: CommentarySlot::default(),
+        }
     }
 
     pub fn is_empty(&self) -> bool {

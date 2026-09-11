@@ -14,7 +14,7 @@ pub use auction::{
 pub use bcflags::BCFlags;
 pub use board::{Board, HiddenHands, PlayerNames, Vulnerability};
 pub use card::{Card, Rank, RankExt, Suit, SuitExt, RANKS_DISPLAY_ORDER, SUITS_DISPLAY_ORDER};
-pub use commentary::{CommentaryBlock, FormattedText, TextSpan};
+pub use commentary::{CommentaryBlock, CommentarySlot, FormattedText, TextSpan};
 pub use deal::{Deal, Direction, DirectionExt};
 pub use hand::{Hand, Holding};
 pub use metadata::{FontSettings, FontSpec, PbnMetadata};
