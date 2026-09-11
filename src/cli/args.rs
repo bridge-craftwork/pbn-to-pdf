@@ -32,9 +32,10 @@ pub struct Args {
     #[arg(long, value_enum, default_value = "portrait")]
     pub orientation: Orientation,
 
-    /// Output layout style
-    #[arg(short = 'l', long, value_enum, default_value = "analysis")]
-    pub layout: Layout,
+    /// Output layout style. Defaults to analysis, or to hand-record when the
+    /// file asks for BridgeComposer's hand record (%BoardsPerPage 18)
+    #[arg(short = 'l', long, value_enum)]
+    pub layout: Option<Layout>,
 
     /// Hide bidding table
     #[arg(long)]
@@ -158,6 +159,8 @@ pub enum Layout {
     DeclarersPlan,
     /// Dealer summary showing board, dealer, contract, declarer, and lead (6 per page)
     DealerSummary,
+    /// Hand record: compact boards, 18 per page, hands and HCP only
+    HandRecord,
 }
 
 impl Layout {
@@ -170,6 +173,7 @@ impl Layout {
             Layout::DeclarersPlan2up => Some(" - Declarers Plan 2up"),
             Layout::DeclarersPlan => Some(" - Declarers Plan 4up"),
             Layout::DealerSummary => Some(" - Dealer Summary"),
+            Layout::HandRecord => Some(" - Hand Record"),
         }
     }
 
@@ -202,17 +206,19 @@ impl Layout {
             Layout::DeclarersPlan2up => 2,
             Layout::DeclarersPlan => 4,
             Layout::DealerSummary => 6,
+            Layout::HandRecord => crate::render::layouts::hand_record::BOARDS_PER_PAGE as u32,
         }
     }
 
     /// Every layout, in CLI declaration order.
-    pub const ALL: [Layout; 6] = [
+    pub const ALL: [Layout; 7] = [
         Layout::Analysis,
         Layout::BiddingSheets,
         Layout::DeclarersPlan1up,
         Layout::DeclarersPlan2up,
         Layout::DeclarersPlan,
         Layout::DealerSummary,
+        Layout::HandRecord,
     ];
 
     /// The layout's canonical name, identical to its `--layout` spelling.
@@ -224,6 +230,18 @@ impl Layout {
             Layout::DeclarersPlan2up => "declarers-plan-2up",
             Layout::DeclarersPlan => "declarers-plan",
             Layout::DealerSummary => "dealer-summary",
+            Layout::HandRecord => "hand-record",
+        }
+    }
+
+    /// The layout a file gets when none is asked for: BridgeComposer renders
+    /// `%BoardsPerPage 18` as its hand record and nothing else does, so that
+    /// value alone picks it (issue #31). Everything else is analysis.
+    pub fn default_for(metadata: &crate::model::PbnMetadata) -> Layout {
+        if metadata.layout.boards_per_page == Some(18) && metadata.layout.column_count == 0 {
+            Layout::HandRecord
+        } else {
+            Layout::Analysis
         }
     }
 }
@@ -255,6 +273,12 @@ impl std::str::FromStr for Layout {
 
 #[cfg(feature = "cli")]
 impl Args {
+    /// The layout asked for, or analysis. `main` settles it from the file
+    /// first, so this is only the fallback for callers that skip that.
+    pub fn layout(&self) -> Layout {
+        self.layout.unwrap_or_default()
+    }
+
     /// Get the output path, defaulting to input with layout-specific suffix
     pub fn output_path(&self) -> PathBuf {
         self.output.clone().unwrap_or_else(|| {
@@ -262,7 +286,7 @@ impl Args {
             let stem = self.input.file_stem().unwrap_or_default().to_string_lossy();
 
             // Add layout-specific suffix if applicable
-            let new_name = if let Some(suffix) = self.layout.output_suffix() {
+            let new_name = if let Some(suffix) = self.layout().output_suffix() {
                 format!("{}{}.pdf", stem, suffix)
             } else {
                 format!("{}.pdf", stem)
@@ -399,7 +423,7 @@ mod tests {
             boards_per_page: 1,
             page_size: PageSize::Letter,
             orientation: Orientation::Portrait,
-            layout: Layout::Analysis,
+            layout: None,
             no_bidding: false,
             no_play: false,
             no_commentary: false,
@@ -418,5 +442,15 @@ mod tests {
         let (w, h) = args.page_dimensions();
         assert!((w - 215.9).abs() < 0.1);
         assert!((h - 279.4).abs() < 0.1);
+    }
+
+    #[test]
+    fn boards_per_page_18_asks_for_the_hand_record() {
+        use crate::parser::header::parse_headers;
+        let layout = |line: &str| Layout::default_for(&parse_headers(&[line]));
+        assert_eq!(layout("%BoardsPerPage 18"), Layout::HandRecord);
+        assert_eq!(layout("%BoardsPerPage 1"), Layout::Analysis);
+        assert_eq!(layout("%BoardsPerPage fit,2"), Layout::Analysis);
+        assert_eq!(Layout::default_for(&Default::default()), Layout::Analysis);
     }
 }

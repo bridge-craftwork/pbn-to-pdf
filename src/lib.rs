@@ -15,7 +15,7 @@ pub use render::generate_pdf;
 use parser::header::parse_headers;
 use render::{
     BiddingSheetsRenderer, DealerSummaryRenderer, DeclarersPlan1UpRenderer,
-    DeclarersPlan2UpRenderer, DeclarersPlanRenderer,
+    DeclarersPlan2UpRenderer, DeclarersPlanRenderer, HandRecordRenderer,
 };
 
 /// Optional rendering flags passed through from library consumers.
@@ -119,5 +119,6 @@ pub fn render_boards(
             let renderer = DealerSummaryRenderer::new(settings);
             renderer.render(boards)
         }
+        Layout::HandRecord => HandRecordRenderer::new(settings).render(boards),
     }
 }

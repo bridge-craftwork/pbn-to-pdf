@@ -91,6 +91,7 @@ check("previewBoardCount matches the layout geometry", () => {
     "declarers-plan-2up": 2,
     "declarers-plan": 4,
     "dealer-summary": 6,
+    "hand-record": 18,
   };
   for (const [layout, n] of Object.entries(want)) {
     const got = previewBoardCount(layout);

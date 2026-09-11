@@ -1809,17 +1809,19 @@ fn preview_boards_renders_a_representative_first_page() {
 
     // Boards that actually carry a deal; the fixture has placeholder entries
     // whose hands parse to nothing.
-    let usable: Vec<pbn_to_pdf::Board> = pbn
+    let with_deals: Vec<pbn_to_pdf::Board> = pbn
         .boards
         .iter()
         .filter(|b| b.deal.north.card_count() == 13)
-        .take(12)
         .cloned()
         .collect();
     assert!(
-        usable.len() >= 8,
+        with_deals.len() >= 8,
         "fixture no longer has enough usable boards"
     );
+    // A hand record page holds eighteen, more than the fixture has: the page
+    // count is all that is measured, so repeat them.
+    let usable: Vec<pbn_to_pdf::Board> = with_deals.iter().cycle().take(20).cloned().collect();
 
     for layout in Layout::ALL {
         let n = layout.preview_boards() as usize;
@@ -1843,6 +1845,7 @@ fn preview_boards_renders_a_representative_first_page() {
                 | Layout::DeclarersPlan1up
                 | Layout::DeclarersPlan2up
                 | Layout::DealerSummary
+                | Layout::HandRecord
         );
         if fixed_geometry {
             assert_eq!(preview, 1, "{layout} preview should be a single page");
