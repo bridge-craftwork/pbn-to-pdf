@@ -65,6 +65,15 @@ impl BCFlags {
         self.raw & 0x00000080 != 0
     }
 
+    /// Show the cards played so far in the card table (bit 11)
+    ///
+    /// BridgeComposer draws the trick in a white card table and greys the
+    /// cards in the hands; the exercise sets use it for "what do you play?"
+    /// boards.
+    pub fn show_trick(&self) -> bool {
+        self.raw & 0x00000800 != 0
+    }
+
     // === Hide flags (bits 20-28) ===
 
     /// Hide the Board field (bit 20)

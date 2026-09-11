@@ -188,3 +188,72 @@ fn a_void_is_an_em_dash() {
     .unwrap();
     assert!(shown_strings(&pdf).iter().any(|s| s == &[0x97]));
 }
+
+/// ABS3-3's 6-1, as that file writes it: a single-suit fragment with the first
+/// two cards of a trick on the table. West leads the 4, North plays the 3.
+///
+/// The play section closes the trick the way a producer does, with seats held
+/// by `-` and a `*` after them, so the table has to look past a trick that
+/// holds no card of its own.
+const TRICK: &str = r#"[Board "6-1"]
+[Dealer "S"]
+[Vulnerable "None"]
+[Deal "S:... 4... T83... KJ5..."]
+[BCFlags "FLAGS"]
+[Hidden "S"]
+[Play "W"]
+S4 S3 - -
+*
+"#;
+
+fn render_trick(flags: &str) -> Vec<Vec<u8>> {
+    let file = parse_pbn(&TRICK.replace("FLAGS", flags)).unwrap();
+    let pdf = render_boards(
+        &file.boards,
+        &[],
+        Layout::Analysis,
+        RenderOptions::default(),
+    )
+    .unwrap();
+    shown_strings(&pdf)
+}
+
+/// `BCFlags` bit 0x800 shows the trick in progress, and BridgeComposer greys
+/// the cards already played. A holding with one is drawn card by card so that
+/// card can take its own colour; every other holding stays one string (#30).
+#[test]
+fn a_played_card_is_drawn_on_its_own_so_it_can_be_greyed() {
+    // Without the flag, North's holding is a single string
+    let shown = render_trick("1f");
+    assert!(shown.iter().any(|s| s == "10 8 3".as_bytes()));
+
+    // With it, the played 3 is split out from the 10 and the 8
+    let shown = render_trick("81f");
+    assert!(!shown.iter().any(|s| s == "10 8 3".as_bytes()));
+    for rank in ["10", "8", "3"] {
+        assert!(
+            shown.iter().any(|s| s == rank.as_bytes()),
+            "{rank:?} not drawn on its own"
+        );
+    }
+}
+
+/// The card table holds the trick, each card at its player's seat. On a
+/// single-suit fragment BridgeComposer prints bare ranks there, with no suit
+/// symbol -- so each played rank is drawn twice, in the hand and in the table.
+#[test]
+fn the_card_table_shows_the_trick_as_bare_ranks() {
+    let count = |shown: &[Vec<u8>], rank: &str| {
+        shown
+            .iter()
+            .filter(|s| s.as_slice() == rank.as_bytes())
+            .count()
+    };
+
+    let shown = render_trick("1f");
+    assert_eq!(count(&shown, "4"), 1, "no card table, so West's 4 once");
+
+    let shown = render_trick("81f");
+    assert_eq!(count(&shown, "4"), 2, "West's 4 in the hand and the table");
+    assert_eq!(count(&shown, "3"), 2, "North's 3 in the hand and the table");
+}
