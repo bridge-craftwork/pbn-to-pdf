@@ -1994,8 +1994,9 @@ impl DocumentRenderer {
                         content_y = Mm(commentary_y);
                     }
                 } else {
-                    // Subsequent blocks: check if we're still above float_until_y
-                    if commentary_y > float_until_y {
+                    // Subsequent blocks float until a line would clear the deal
+                    // content -- the same test render_float applies per line
+                    if !float_layout.clears(commentary_y, commentary_renderer.line_ascent()) {
                         // Still in float zone
                         let block_start_y = commentary_y;
                         let result = commentary_renderer.render_float(
