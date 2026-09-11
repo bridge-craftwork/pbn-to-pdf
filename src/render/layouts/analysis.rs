@@ -2,15 +2,14 @@ use crate::config::Settings;
 use crate::error::RenderError;
 use crate::model::card::RankExt;
 use crate::model::{AuctionExt, BidSuit, Board, Direction, Suit, SUITS_DISPLAY_ORDER};
-use printpdf::{
-    BuiltinFont, Color, FontId, Mm, PaintMode, PdfDocument, PdfPage, PdfSaveOptions, Rgb,
-};
+use printpdf::{BuiltinFont, Color, FontId, Mm, PaintMode, PdfPage, PdfSaveOptions, Rgb};
 
 use crate::render::components::bidding_table::BiddingTableRenderer;
 use crate::render::components::commentary::{CommentaryRenderer, FloatLayout};
 use crate::render::components::hand_diagram::{DiagramDisplayOptions, HandDiagramRenderer};
 use crate::render::helpers::colors::{SuitColors, BLACK};
 use crate::render::helpers::compress::compress_pdf;
+use crate::render::helpers::document::new_document;
 use crate::render::helpers::fonts::FontManager;
 use crate::render::helpers::layer::LayerBuilder;
 use crate::render::helpers::text_metrics::{self, get_times_measurer};
@@ -454,7 +453,7 @@ impl DocumentRenderer {
             .map(|s| s.as_str())
             .unwrap_or("Bridge Hands");
 
-        let mut doc = PdfDocument::new(title);
+        let mut doc = new_document(title);
 
         // Load fonts - printpdf 0.8 handles subsetting automatically
         let fonts = FontManager::new(&mut doc)?;

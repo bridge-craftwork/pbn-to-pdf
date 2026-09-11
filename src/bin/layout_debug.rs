@@ -3,9 +3,10 @@
 
 use pbn_to_pdf::config::Settings;
 use pbn_to_pdf::render::get_times_measurer;
+use pbn_to_pdf::render::helpers::document::new_document;
 use printpdf::{
-    BuiltinFont, Color, Line, LinePoint, Mm, Op, PaintMode, PdfDocument, PdfFontHandle, PdfPage,
-    PdfSaveOptions, Point, Polygon, PolygonRing, Pt, Rgb, TextItem, WindingOrder,
+    BuiltinFont, Color, Line, LinePoint, Mm, Op, PaintMode, PdfFontHandle, PdfPage, PdfSaveOptions,
+    Point, Polygon, PolygonRing, Pt, Rgb, TextItem, WindingOrder,
 };
 use std::fs::File;
 use std::io::BufWriter;
@@ -19,7 +20,7 @@ fn main() {
     let cap_height = measurer.cap_height_mm(font_size);
 
     // Create PDF
-    let mut doc = PdfDocument::new("Layout Debug");
+    let mut doc = new_document("Layout Debug");
 
     // Use builtin font
     let font = BuiltinFont::TimesRoman;

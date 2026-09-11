@@ -1912,3 +1912,43 @@ fn rendering_is_byte_reproducible_across_runs() {
         );
     }
 }
+
+/// Every layout stamps the renderer's version into the PDF (issue #23), so a
+/// packaged handout can say which build made it without being re-rendered and
+/// diffed.
+#[test]
+fn every_layout_stamps_the_producer() {
+    let content = fs::read_to_string(fixtures_path().join("Drury.pbn")).unwrap();
+    let pbn_file = parse_pbn(&content).unwrap();
+    let boards = &pbn_file.boards[..4];
+    let expected = format!("pbn-to-pdf {}", env!("CARGO_PKG_VERSION"));
+
+    for layout in Layout::ALL {
+        let pdf = render_boards(boards, &[], layout, RenderOptions::default()).unwrap();
+        let doc = lopdf::Document::load_mem(&pdf).unwrap();
+        let info_id = doc.trailer.get(b"Info").unwrap().as_reference().unwrap();
+        let info = doc.get_dictionary(info_id).unwrap();
+        for key in ["Producer", "Creator"] {
+            let bytes = info.get(key.as_bytes()).unwrap().as_str().unwrap();
+            assert_eq!(
+                decode_pdf_text(bytes),
+                expected,
+                "{layout} /{key} does not name the build"
+            );
+        }
+    }
+}
+
+/// A PDF text string: UTF-16BE behind a byte-order mark, else one byte a char.
+fn decode_pdf_text(bytes: &[u8]) -> String {
+    match bytes.strip_prefix(&[0xFE, 0xFF]) {
+        Some(utf16) => {
+            let units: Vec<u16> = utf16
+                .chunks_exact(2)
+                .map(|pair| u16::from_be_bytes([pair[0], pair[1]]))
+                .collect();
+            String::from_utf16(&units).unwrap()
+        }
+        None => bytes.iter().map(|&b| b as char).collect(),
+    }
+}
