@@ -52,6 +52,11 @@ pub struct Args {
     #[arg(long)]
     pub no_hcp: bool,
 
+    /// Leave out page furniture: the event header or headings and the
+    /// %PageFooter lines. For pipelines that add their own.
+    #[arg(long)]
+    pub no_page_furniture: bool,
+
     /// Board range to include (e.g., "1-16" or "5,8,12")
     #[arg(short = 'b', long)]
     pub boards: Option<String>,
@@ -399,6 +404,7 @@ mod tests {
             no_play: false,
             no_commentary: false,
             no_hcp: false,
+            no_page_furniture: false,
             boards: None,
             margins: None,
             debug_boxes: false,

@@ -56,6 +56,22 @@ pub struct Settings {
     /// Title from metadata (HRTitleEvent)
     pub title_from_metadata: Option<String>,
 
+    /// Print the page furniture the PBN asks for: the event header or
+    /// headings and the `%PageFooter` lines (issue #28). On by default, as in
+    /// Bridge Composer; pipelines that add their own turn it off.
+    pub page_furniture: bool,
+    /// `PageHeader` in `%BCOptions`: the event as a header in the top margin,
+    /// rather than as a heading atop each column
+    pub page_header: bool,
+    /// How far above the top margin the page header sits, in points
+    pub event_spacing_pt: f32,
+    /// `%PageFooter` cells
+    pub page_footers: Vec<crate::model::metadata::PageFooterCell>,
+    /// `%HRTitleDate`, `%HRTitleSite` and `%HRTitleSetID`, for footer tokens
+    pub title_date: Option<String>,
+    pub title_site: Option<String>,
+    pub title_set_id: Option<String>,
+
     /// Board label format from %Translate directive
     /// Format string where "%" is replaced with the board number
     /// Default is "Board %" -> "Board 1", can be "%)" -> "1)"
@@ -116,6 +132,13 @@ impl Default for Settings {
             center: false,
             title_override: None,
             title_from_metadata: None,
+            page_furniture: true,
+            page_header: false,
+            event_spacing_pt: 0.0,
+            page_footers: Vec::new(),
+            title_date: None,
+            title_site: None,
+            title_set_id: None,
             board_label_format: "Board %".to_string(),
 
             hand_width: DEFAULT_HAND_WIDTH,
@@ -181,6 +204,7 @@ impl Settings {
             circle_promotable_winners: args.circle_promotable_winners,
             circle_length_winners: args.circle_length_winners,
             title_override: args.title.clone(),
+            page_furniture: !args.no_page_furniture,
             ..Default::default()
         }
     }
@@ -268,6 +292,14 @@ impl Settings {
 
         // Store title from metadata (HRTitleEvent)
         self.title_from_metadata = metadata.title_event.clone();
+
+        // Page furniture (issue #28)
+        self.page_header = metadata.layout.page_header;
+        self.event_spacing_pt = metadata.layout.event_spacing.unwrap_or(0.0);
+        self.page_footers = metadata.page_footers.clone();
+        self.title_date = metadata.title_date.clone();
+        self.title_site = metadata.title_site.clone();
+        self.title_set_id = metadata.title_set_id.clone();
 
         // Apply board label format from %Translate directive
         if let Some(ref fmt) = metadata.layout.board_label_format {

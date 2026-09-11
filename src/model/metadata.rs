@@ -18,6 +18,12 @@ pub struct LayoutSettings {
     pub center: bool,
     /// Two-column auctions: display uncontested auctions in only two columns
     pub two_col_auctions: bool,
+    /// `PageHeader` in `%BCOptions`: the event goes in a header in the top
+    /// margin of each page, rather than as a heading atop each column
+    pub page_header: bool,
+    /// `%EventSpacing` (or the first `%SectionSpacing` value), in points: how
+    /// far above the top margin the page header sits
+    pub event_spacing: Option<f32>,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -149,6 +155,15 @@ impl Default for ColorSettings {
     }
 }
 
+/// One `%PageFooter:<row>,<column> "text"` cell: Bridge Composer prints row 0,
+/// columns 0, 1 and 2 left, centred and right beneath each page
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PageFooterCell {
+    pub row: u8,
+    pub column: u8,
+    pub text: String,
+}
+
 /// Complete PBN file metadata
 #[derive(Debug, Clone, Default)]
 pub struct PbnMetadata {
@@ -157,6 +172,11 @@ pub struct PbnMetadata {
     pub created: Option<String>,
     pub title_event: Option<String>,
     pub title_date: Option<String>,
+    /// `%HRTitleSite`
+    pub title_site: Option<String>,
+    /// `%HRTitleSetID`
+    pub title_set_id: Option<String>,
+    pub page_footers: Vec<PageFooterCell>,
     pub layout: LayoutSettings,
     pub fonts: FontSettings,
     pub colors: ColorSettings,

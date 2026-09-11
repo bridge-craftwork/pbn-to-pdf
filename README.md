@@ -46,6 +46,7 @@ pbn-to-pdf [OPTIONS] <INPUT>
 | `--no-play` | Hide play sequence |
 | `--no-commentary` | Hide commentary text |
 | `--no-hcp` | Hide HCP point counts |
+| `--no-page-furniture` | Leave out the page header or event headings and the `%PageFooter` lines, for pipelines that add their own |
 | `-b, --boards <RANGE>` | Board range to include (e.g., "1-16" or "5,8,12") |
 | `-t, --title [TITLE]` | Title for bidding sheets banner (overrides %HRTitleEvent; use with no value to hide) |
 | `--debug-boxes` | Draw debug boxes around layout regions |
