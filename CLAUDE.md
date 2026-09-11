@@ -281,13 +281,25 @@ the binary twice instead of calling `render_boards` twice.
 ## Card asset pipeline
 
 `assets/cards/*.svg` are the 52 base cards; `assets/cards/variants/` holds the
-24 reduced court-card assets derived from them. Two tools maintain these, and
+24 reduced court-card assets derived from them. Three steps maintain these, and
 they run in order:
 
 ```bash
 python3 tools/svg_text_to_paths.py     # needs fonttools; usually already done
+npx --yes svgo@4.1.0 --config tools/svgo-cards.config.mjs -f assets/cards -o assets/cards
 python3 tools/make_card_variants.py    # regenerate variants after any base edit
 ```
+
+The svgo pass rounds path coordinates to two decimals -- 0.01pt, far below a
+printed pixel -- and is idempotent. It took the base cards from 8.2 MB to
+4.8 MB, the gzipped wasm bundle from 9.2 MB to 7.4 MB, and the engine's peak
+memory during a declarer's plan down 4.3 MB, since the art is static data copied
+into linear memory at load. It does **not** shrink the PDFs: svg2pdf
+re-serializes every coordinate at its own precision, so a declarer's plan moves
+by about 0.1%. The config turns two plugins off on purpose -- see its comments:
+`cleanupNumericValues` rewrites `width="...pt"` as unitless px and draws every
+card a third too big, and the smooth-curve shorthands emit `s` commands that
+`tools/svgpath.py` cannot parse.
 
 `svg_text_to_paths.py` is why the corner rank indices are `<path>` and not
 `<text>`. The originals drew them as `<text font-family="Arial">`, which usvg
