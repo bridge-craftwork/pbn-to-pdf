@@ -97,6 +97,32 @@ Every layout renders pixel-identical in native and wasm, verified by
 rasterizing both and comparing. That depends on the card rank indices being
 vector paths rather than `<text>` — see below.
 
+### Footprint
+
+`node wasm/measure-memory.mjs [file.pbn]` (after the same nodejs build) reports
+where the engine's bytes go. As of the #26 card-art pass, measured in Node, which
+uses the same V8 engine as Chrome:
+
+| | |
+|---|---|
+| download | 17.65 MB raw, 7.43 MB gzipped |
+| module | 7.26 MiB code, 9.56 MiB static data (about half of it card art) |
+| memory at load | 10.69 MiB |
+| peak, 8-board declarer's plan | 25.88 MiB |
+| peak, analysis or bidding sheets | 12.50 MiB |
+
+Three properties matter more than the numbers:
+
+- **Static data costs memory, not just download.** The card art is compiled in
+  with `include_str!` and parsed as a borrowed `&'static str`, so it is never
+  copied onto the heap — but wasm copies every data segment into linear memory
+  at instantiation. Shrinking the art shrinks the tab's footprint whether or not
+  a card layout is ever rendered.
+- **Linear memory never shrinks.** The peak is what a tab holds for as long as
+  the engine stays loaded, so the heaviest layout sets the cost of the session.
+- **It plateaus.** A second pass of every layout adds nothing, which the script
+  checks: growth there would mean a leak.
+
 ## Web app
 
 `web/` is a Vite + Vue 3 front-end over the wasm build, deployed to Cloudflare
@@ -110,8 +136,8 @@ A few things in `web/vite.config.js` are load-bearing rather than decorative:
 - `optimizeDeps.exclude` on the generated module — `wasm-pack --target web`
   loads the binary with `new URL('..._bg.wasm', import.meta.url)`, and dep
   optimisation would rewrite that URL in dev.
-- `manualChunks` puts the engine in its own content-hashed chunk. It is ~21 MB
-  and changes rarely; app code is ~30 kB gzipped. Without the split every
+- `manualChunks` puts the engine in its own content-hashed chunk. It is about
+  17.7 MB (7.4 MB gzipped) and changes rarely; app code is ~30 kB gzipped. Without the split every
   app-code deploy re-downloads the engine for everyone.
 
 The lesson library is the **Rotations** export of Baker Bridge, read from its
