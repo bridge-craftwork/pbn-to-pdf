@@ -3,9 +3,10 @@
 
 use pbn_to_pdf::config::Settings;
 use pbn_to_pdf::render::get_times_measurer;
+use pbn_to_pdf::render::helpers::layer::save_options;
 use printpdf::{
     BuiltinFont, Color, Line, LinePoint, Mm, Op, PaintMode, PdfDocument, PdfFontHandle, PdfPage,
-    PdfSaveOptions, Point, Polygon, PolygonRing, Pt, Rgb, TextItem, WindingOrder,
+    Point, Polygon, PolygonRing, Pt, Rgb, TextItem, WindingOrder,
 };
 use std::fs::File;
 use std::io::BufWriter;
@@ -243,7 +244,7 @@ fn main() {
     // Save
     let file = File::create("/tmp/layout_debug.pdf").unwrap();
     let mut warnings = Vec::new();
-    let bytes = doc.save(&PdfSaveOptions::default(), &mut warnings);
+    let bytes = doc.save(&save_options(), &mut warnings);
     std::io::Write::write_all(&mut BufWriter::new(file), &bytes).unwrap();
     println!();
     println!("Saved to /tmp/layout_debug.pdf");
