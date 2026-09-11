@@ -1266,9 +1266,30 @@ impl DocumentRenderer {
         let cap_height = measurer.cap_height_mm(self.settings.body_font_size);
         let descender = measurer.descender_mm(self.settings.body_font_size);
 
+        // Center mode lays the page out as Bridge Composer does (issue #25):
+        // the diagram and auction centred, and each commentary block in its
+        // slot -- the event commentary above the board, the rest full width
+        // below it -- instead of floated beside the diagram.
+        let center = self.settings.center;
+        let commentary = ColumnCommentary::of(board, &self.settings);
+        let board_top = if center && !commentary.above.is_empty() {
+            let ascender = measurer.ascender_mm(self.settings.commentary_font_size);
+            let end = self.render_blocks(
+                layer,
+                &commentary.above,
+                fonts,
+                margin_left,
+                page_top - ascender,
+                self.settings.content_width(),
+            );
+            end - line_height
+        } else {
+            page_top
+        };
+
         // Title: 3 lines stacked vertically, positioned above West hand area
         let title_x = margin_left;
-        let title_start_y = page_top;
+        let title_start_y = board_top;
 
         // Build title lines and measure widths
         // Show board info if deal has cards OR there's an auction (for exercise boards)
@@ -1356,8 +1377,12 @@ impl DocumentRenderer {
 
         // Diagram origin: same Y as page_top (North aligns with "Board 1")
         // The diagram renderer will place North to the right (after hand_width gap for title)
-        let diagram_x = margin_left;
-        let diagram_y = page_top; // Start at same level as title
+        let diagram_x = if center {
+            margin_left + (self.settings.content_width() - self.settings.diagram_width()) / 2.0
+        } else {
+            margin_left
+        };
+        let diagram_y = board_top; // Start at same level as title
 
         // Content below diagram (or title if no diagram)
         let mut content_y;
@@ -1395,7 +1420,20 @@ impl DocumentRenderer {
         } else {
             // No diagram, content starts below any title lines
             let title_height = title_lines.len() as f32 * line_height;
-            content_y = Mm(page_top - title_height - 5.0);
+            content_y = Mm(board_top - title_height - 5.0);
+        }
+
+        // Center mode: the diagram commentary, full width under the diagram
+        if center && !commentary.under_diagram.is_empty() {
+            let end = self.render_blocks(
+                layer,
+                &commentary.under_diagram,
+                fonts,
+                margin_left,
+                content_y.0,
+                self.settings.content_width(),
+            );
+            content_y = Mm(end - line_height);
         }
 
         // Render bidding table if present
@@ -1408,15 +1446,6 @@ impl DocumentRenderer {
                     fonts.symbol_font(), // DejaVu Sans for suit symbols
                     &self.settings,
                 );
-                // Notes wrap to the left half when commentary will float on the right,
-                // otherwise use the full content width.
-                let has_floating_commentary =
-                    self.settings.show_commentary && board.commentary.iter().any(|c| !c.is_blank());
-                let notes_max_width = if has_floating_commentary {
-                    self.settings.content_width() / 2.0 - 2.0
-                } else {
-                    self.settings.content_width()
-                };
                 let num_cols =
                     if self.settings.two_col_auctions && auction.uncontested_pair().is_some() {
                         2
@@ -1424,16 +1453,33 @@ impl DocumentRenderer {
                         4
                     };
                 let table_width = num_cols as f32 * self.settings.bid_column_width;
+                // Center mode centres the auction; the contract and lead line
+                // up with its left edge
+                let table_x = if center {
+                    margin_left + (self.settings.content_width() - table_width) / 2.0
+                } else {
+                    margin_left
+                };
+                // Notes wrap to the left half when commentary will float on the right,
+                // otherwise run to the right margin.
+                let has_floating_commentary = !center
+                    && self.settings.show_commentary
+                    && board.commentary.iter().any(|c| !c.is_blank());
+                let notes_max_width = if has_floating_commentary {
+                    self.settings.content_width() / 2.0 - 2.0
+                } else {
+                    self.settings.content_width() - (table_x - margin_left)
+                };
                 let table_height = bidding_renderer.render_with_players_and_notes_width(
                     layer,
                     auction,
-                    (Mm(margin_left), content_y),
+                    (Mm(table_x), content_y),
                     Some(&board.players),
                     Some(notes_max_width),
                 );
 
                 // Debug box for bidding table
-                self.draw_debug_box(layer, margin_left, content_y.0, table_width, table_height);
+                self.draw_debug_box(layer, table_x, content_y.0, table_width, table_height);
 
                 content_y = Mm(content_y.0 - table_height);
 
@@ -1457,17 +1503,17 @@ impl DocumentRenderer {
                     let x = self.render_contract(
                         layer,
                         contract,
-                        Mm(margin_left),
+                        Mm(table_x),
                         content_y,
                         hand_record_fonts.regular,
                         fonts.symbol_font(),
                         &colors,
                     );
                     // Debug box for contract line
-                    let contract_width = x - margin_left;
+                    let contract_width = x - table_x;
                     self.draw_debug_box(
                         layer,
-                        margin_left,
+                        table_x,
                         content_y.0 + cap_height,
                         contract_width,
                         cap_height + descender,
@@ -1486,7 +1532,7 @@ impl DocumentRenderer {
                             self.render_lead(
                                 layer,
                                 &lead_card,
-                                Mm(margin_left),
+                                Mm(table_x),
                                 content_y,
                                 hand_record_fonts.regular,
                                 fonts.symbol_font(),
@@ -1495,7 +1541,7 @@ impl DocumentRenderer {
                             // Debug box for lead line
                             self.draw_debug_box(
                                 layer,
-                                margin_left,
+                                table_x,
                                 content_y.0 + cap_height,
                                 table_width,
                                 cap_height + descender,
@@ -1508,8 +1554,18 @@ impl DocumentRenderer {
             }
         }
 
-        // Render commentary if present - using floating layout
-        if self.settings.show_commentary && board.commentary.iter().any(|c| !c.is_blank()) {
+        // Center mode: the rest of the commentary, full width below the board
+        if center {
+            self.render_blocks(
+                layer,
+                &commentary.below,
+                fonts,
+                margin_left,
+                content_y.0 - line_height,
+                self.settings.content_width(),
+            );
+        } else if self.settings.show_commentary && board.commentary.iter().any(|c| !c.is_blank()) {
+            // Render commentary - using floating layout
             let commentary_renderer = CommentaryRenderer::new(
                 commentary_fonts.regular,
                 commentary_fonts.bold,
