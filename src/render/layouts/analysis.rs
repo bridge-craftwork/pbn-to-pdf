@@ -244,6 +244,28 @@ fn played_card_count(play: &PlaySequence) -> usize {
         .sum()
 }
 
+/// The `[Event]` in force at each board: its own when it names one, and
+/// otherwise the last one named before it.
+///
+/// A PBN names the event once and leaves every later record `[Event ""]`, so a
+/// running page header has to carry it forward -- BridgeComposer heads all 11
+/// pages of ABS3-3's exercises with `Third-Hand Play` though only the first
+/// record names it (issue #50). The heading drawn when there is no page header
+/// is a different thing and does not carry: with `PageHeader` cleared,
+/// BridgeComposer prints the name exactly once, at the record that names it.
+fn running_events(boards: &[Board]) -> Vec<Option<&str>> {
+    let mut in_force = None;
+    boards
+        .iter()
+        .map(|board| {
+            if let Some(event) = board_event(board) {
+                in_force = Some(event);
+            }
+            in_force
+        })
+        .collect()
+}
+
 /// A board's `[Event]`, when it has one worth printing
 fn board_event(board: &Board) -> Option<&str> {
     board.event.as_deref().filter(|e| !e.trim().is_empty())
@@ -613,13 +635,18 @@ impl DocumentRenderer {
         } else {
             // Single board per page (original behavior)
             let mut layers = Vec::new();
-            for board in boards {
+            let in_force = running_events(boards);
+            for (board, running) in boards.iter().zip(in_force) {
                 let mut layer = LayerBuilder::new();
                 let mut top = self.settings.page_height - self.settings.margin_top;
-                if let (Some(furniture), Some(event)) = (&furniture, board_event(board)) {
+                if let Some(furniture) = &furniture {
                     if self.settings.page_header {
-                        furniture.draw_header(&mut layer, event);
-                    } else {
+                        // A running header carries the event forward
+                        if let Some(event) = running {
+                            furniture.draw_header(&mut layer, event);
+                        }
+                    } else if let Some(event) = board_event(board) {
+                        // A heading prints once, at the record that names it
                         top -= furniture.draw_heading(
                             &mut layer,
                             event,
@@ -713,14 +740,16 @@ impl DocumentRenderer {
         let board_spacing = 5.0;
 
         // Process boards dynamically - fill each column until no more space
-        let mut board_iter = boards.iter().peekable();
+        let in_force = running_events(boards);
+        let mut board_iter = boards.iter().enumerate().peekable();
 
         while board_iter.peek().is_some() {
             let mut layer = LayerBuilder::new();
 
-            // Page header: the event of the page's first board
+            // Page header: the event in force at the page's first board, which
+            // is not always a board that names one (issue #50)
             if let Some(furniture) = furniture.filter(|_| self.settings.page_header) {
-                if let Some(event) = board_iter.peek().and_then(|b| board_event(b)) {
+                if let Some(event) = board_iter.peek().and_then(|&(i, _)| in_force[i]) {
                     furniture.draw_header(&mut layer, event);
                 }
             }
@@ -760,7 +789,7 @@ impl DocumentRenderer {
                 // Without a page header, the event heads each column: that of
                 // the board the column starts with
                 if let Some(furniture) = furniture.filter(|_| !self.settings.page_header) {
-                    if let Some(event) = board_iter.peek().and_then(|b| board_event(b)) {
+                    if let Some(event) = board_iter.peek().and_then(|&(_, b)| board_event(b)) {
                         column_y[col_idx] -= furniture.draw_heading(
                             &mut layer,
                             event,
@@ -771,7 +800,7 @@ impl DocumentRenderer {
                     }
                 }
 
-                while let Some(&next) = board_iter.peek() {
+                while let Some(&(_, next)) = board_iter.peek() {
                     // Page break marker - force new page
                     if is_page_break(next) {
                         // Name-based markers are just markers with no content — consume them
@@ -819,7 +848,7 @@ impl DocumentRenderer {
                     }
 
                     // Board fits - consume and render it
-                    let board = board_iter.next().unwrap();
+                    let board = board_iter.next().unwrap().1;
 
                     // Draw horizontal separator if not at top
                     if column_board_count[col_idx] > 0 {
