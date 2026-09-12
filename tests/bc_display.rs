@@ -377,3 +377,93 @@ fn the_lead_line_gives_way_to_the_card_table_and_the_play_record() {
         "7f with a real play record drops it"
     );
 }
+
+/// The board label is set in bold italic, as BridgeComposer sets it (#44).
+///
+/// BridgeComposer 5.118.2 draws `6-1)` on ABS3-3's exercises in bold italic at
+/// the top left of the cell, on the north hand's baseline. The Center work
+/// (#35) moved it there from under the diagram; this pins the face, which is
+/// easy to lose because the label shares a font set with the roman dealer and
+/// vulnerability lines beside it.
+#[test]
+fn the_board_label_is_bold_italic() {
+    let pbn = format!("%BCOptions ShowHCP\n\n{}", BOARD.replace("FLAGS", "0"));
+    let headers = vec!["%BCOptions ShowHCP".to_string()];
+    let file = parse_pbn(&pbn).unwrap();
+    let pdf = render_boards(
+        &file.boards,
+        &headers,
+        Layout::Analysis,
+        RenderOptions::default(),
+    )
+    .unwrap();
+    assert_eq!(
+        label_font(&pdf, "Board 1").as_deref(),
+        Some("Times-BoldItalic"),
+        "the board label wants the bold italic face"
+    );
+}
+
+/// The BaseFont in force when `text` is drawn.
+fn label_font(pdf: &[u8], text: &str) -> Option<String> {
+    let doc = lopdf::Document::load_mem(pdf).unwrap();
+
+    // /Fn -> BaseFont, over every resource dictionary in the file
+    let mut base: std::collections::HashMap<String, String> = std::collections::HashMap::new();
+    let resolve = |o: &lopdf::Object| -> Option<lopdf::Dictionary> {
+        match o {
+            lopdf::Object::Dictionary(d) => Some(d.clone()),
+            lopdf::Object::Reference(r) => match doc.get_object(*r) {
+                Ok(lopdf::Object::Dictionary(d)) => Some(d.clone()),
+                _ => None,
+            },
+            _ => None,
+        }
+    };
+    for object in doc.objects.values() {
+        let lopdf::Object::Dictionary(d) = object else {
+            continue;
+        };
+        let Ok(fonts) = d.get(b"Font") else { continue };
+        let Some(fonts) = resolve(fonts) else {
+            continue;
+        };
+        for (name, value) in fonts.iter() {
+            let Some(fd) = resolve(value) else { continue };
+            if let Ok(lopdf::Object::Name(bf)) = fd.get(b"BaseFont") {
+                base.insert(
+                    String::from_utf8_lossy(name).to_string(),
+                    String::from_utf8_lossy(bf).to_string(),
+                );
+            }
+        }
+    }
+
+    for object in doc.objects.values() {
+        let lopdf::Object::Stream(stream) = object else {
+            continue;
+        };
+        let Ok(bytes) = stream.decompressed_content() else {
+            continue;
+        };
+        let Ok(content) = lopdf::content::Content::decode(&bytes) else {
+            continue;
+        };
+        let mut current = None;
+        for op in &content.operations {
+            if op.operator == "Tf" {
+                if let Some(lopdf::Object::Name(n)) = op.operands.first() {
+                    current = base.get(&String::from_utf8_lossy(n).to_string()).cloned();
+                }
+            }
+            if op.operator == "Tj" {
+                if let Some(lopdf::Object::String(t, _)) = op.operands.first() {
+                    if String::from_utf8_lossy(t) == text {
+                        return current;
+                    }
+                }
+            }
+        }
+    }
+    None
+}
