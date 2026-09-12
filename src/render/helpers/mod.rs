@@ -3,6 +3,7 @@
 pub mod card_assets;
 pub mod colors;
 pub mod compress;
+pub mod document;
 pub mod fonts;
 pub mod layer;
 pub mod layout;

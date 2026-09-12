@@ -18,6 +18,7 @@ use crate::render::components::DeclarersPlanSmallRenderer;
 use crate::render::helpers::card_assets::{CardAssets, CardFace};
 use crate::render::helpers::colors::{SuitColors, BLUE, GREEN, RED};
 use crate::render::helpers::compress::compress_pdf;
+use crate::render::helpers::document::new_document;
 use crate::render::helpers::fonts::FontManager;
 use crate::render::helpers::layer::{save_options, LayerBuilder};
 
@@ -269,7 +270,7 @@ impl DeclarersPlan1UpRenderer {
             .map(|s| s.as_str())
             .unwrap_or("Declarer's Plan");
 
-        let mut doc = PdfDocument::new(title);
+        let mut doc = new_document(title);
         let fonts = FontManager::new(&mut doc)?;
         let card_assets = CardAssets::load_faces(&mut doc, &required_faces(boards))
             .map_err(|e| RenderError::CardAsset(e.to_string()))?;
@@ -353,7 +354,7 @@ impl DeclarersPlan2UpRenderer {
             .map(|s| s.as_str())
             .unwrap_or("Declarer's Plan");
 
-        let mut doc = PdfDocument::new(title);
+        let mut doc = new_document(title);
         let fonts = FontManager::new(&mut doc)?;
         let card_assets = CardAssets::load_faces(&mut doc, &required_faces(boards))
             .map_err(|e| RenderError::CardAsset(e.to_string()))?;
@@ -452,7 +453,7 @@ impl DeclarersPlanRenderer {
             .map(|s| s.as_str())
             .unwrap_or("Declarer's Plan Practice");
 
-        let mut doc = PdfDocument::new(title);
+        let mut doc = new_document(title);
         let fonts = FontManager::new(&mut doc)?;
         let card_assets = CardAssets::load_faces(&mut doc, &required_faces(boards))
             .map_err(|e| RenderError::CardAsset(e.to_string()))?;

@@ -59,6 +59,45 @@ for (const layout of layouts()) {
   });
 }
 
+// A PDF text string from the Info dictionary: `(literal)` or `<hex>`, holding
+// UTF-16BE behind a byte-order mark or else one byte per character.
+const infoString = (pdf, key) => {
+  const text = Buffer.from(pdf).toString("latin1");
+  const at = text.indexOf(`/${key}`);
+  if (at < 0) return null;
+  let i = at + key.length + 1;
+  while (/\s/.test(text[i])) i++;
+  const bytes = [];
+  if (text[i] === "<") {
+    const hex = text.slice(i + 1, text.indexOf(">", i)).replace(/\s/g, "");
+    for (let j = 0; j < hex.length; j += 2) bytes.push(parseInt(hex.slice(j, j + 2), 16));
+  } else if (text[i] === "(") {
+    const escapes = { n: 10, r: 13, t: 9, b: 8, f: 12 };
+    for (i++; text[i] !== ")"; i++) {
+      if (text[i] !== "\\") { bytes.push(text.charCodeAt(i)); continue; }
+      const c = text[++i];
+      const octal = text.slice(i).match(/^[0-7]{1,3}/);
+      if (octal) { bytes.push(parseInt(octal[0], 8)); i += octal[0].length - 1; }
+      else bytes.push(escapes[c] ?? c.charCodeAt(0));
+    }
+  } else return null;
+  const b = Buffer.from(bytes);
+  return b[0] === 0xfe && b[1] === 0xff ? b.subarray(2).swap16().toString("utf16le") : b.toString("latin1");
+};
+
+// Every PDF names the build that made it (issue #23). The wasm engine is the
+// same crate, so it must carry the same version as the Cargo manifest.
+const version = readFileSync(join(root, "Cargo.toml"), "utf8").match(/^version = "(.+)"/m)[1];
+for (const layout of layouts()) {
+  check(`renderPbn(${layout}) names its producer`, () => {
+    const pdf = renderPreview(pbn, layout);
+    for (const key of ["Producer", "Creator"]) {
+      const got = infoString(pdf, key);
+      if (got !== `pbn-to-pdf ${version}`) throw new Error(`/${key} is ${JSON.stringify(got)}`);
+    }
+  });
+}
+
 // The circling options are the one place the JS-side struct crosses over.
 check("renderPbn honours RenderOptions", () => {
   const opts = new RenderOptions();
