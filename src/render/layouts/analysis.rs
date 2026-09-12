@@ -6,7 +6,9 @@ use printpdf::{BuiltinFont, Color, FontId, Mm, PaintMode, PdfPage, Rgb};
 
 use crate::render::components::bidding_table::BiddingTableRenderer;
 use crate::render::components::commentary::{CommentaryRenderer, FloatLayout};
-use crate::render::components::hand_diagram::{DiagramDisplayOptions, HandDiagramRenderer};
+use crate::render::components::hand_diagram::{
+    holding_text, DiagramDisplayOptions, HandDiagramRenderer,
+};
 use crate::render::helpers::colors::{SuitColors, BLACK};
 use crate::render::helpers::compress::compress_pdf;
 use crate::render::helpers::document::new_document;
@@ -1316,13 +1318,7 @@ impl DocumentRenderer {
                     let hand_width = suits_to_show
                         .iter()
                         .map(|suit| {
-                            let holding = hand.holding(*suit);
-                            let cards_str = holding
-                                .ranks
-                                .iter()
-                                .map(|r| r.display_str().to_string())
-                                .collect::<Vec<_>>()
-                                .join(" ");
+                            let cards_str = holding_text(hand.holding(*suit));
                             if show_suit_symbols {
                                 let line = format!("{} {}", suit.symbol(), cards_str);
                                 hand_measurer.measure_width_mm(&line, self.settings.card_font_size)
@@ -1368,12 +1364,7 @@ impl DocumentRenderer {
 
                         // Render cards
                         layer.set_fill_color(Color::Rgb(BLACK));
-                        let cards_str = holding
-                            .ranks
-                            .iter()
-                            .map(|r| r.display_str().to_string())
-                            .collect::<Vec<_>>()
-                            .join(" ");
+                        let cards_str = holding_text(holding);
                         layer.use_text_builtin(
                             &cards_str,
                             self.settings.card_font_size,

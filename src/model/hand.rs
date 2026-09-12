@@ -20,16 +20,23 @@ use super::card::{rank_display_cmp, Rank, RankExt, Suit, SUITS_DISPLAY_ORDER};
 pub struct Holding {
     /// Ranks stored in display order (Ace, King, Queen, ... Two)
     pub ranks: Vec<Rank>,
+    /// Spot cards whose rank the file does not give -- the `x`s of `Kxx` --
+    /// which a diagram shows after the ranks
+    pub unknown: u8,
 }
 
 impl Holding {
     pub fn new() -> Self {
-        Self { ranks: Vec::new() }
+        Self {
+            ranks: Vec::new(),
+            unknown: 0,
+        }
     }
 
     pub fn from_ranks(ranks: impl IntoIterator<Item = Rank>) -> Self {
         let mut holding = Self {
             ranks: ranks.into_iter().collect(),
+            unknown: 0,
         };
         holding.sort_display_order();
         holding
@@ -47,12 +54,13 @@ impl Holding {
         }
     }
 
+    /// Cards held, the unknown spots included
     pub fn len(&self) -> usize {
-        self.ranks.len()
+        self.ranks.len() + self.unknown as usize
     }
 
     pub fn is_empty(&self) -> bool {
-        self.ranks.is_empty()
+        self.ranks.is_empty() && self.unknown == 0
     }
 
     pub fn hcp(&self) -> u8 {
@@ -60,7 +68,7 @@ impl Holding {
     }
 
     pub fn is_void(&self) -> bool {
-        self.ranks.is_empty()
+        self.is_empty()
     }
 
     pub fn contains(&self, rank: &Rank) -> bool {
@@ -70,11 +78,14 @@ impl Holding {
 
 impl fmt::Display for Holding {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if self.ranks.is_empty() {
+        if self.is_void() {
             write!(f, "-")
         } else {
             for rank in &self.ranks {
                 write!(f, "{}", rank.display_str())?;
+            }
+            for _ in 0..self.unknown {
+                write!(f, "x")?;
             }
             Ok(())
         }

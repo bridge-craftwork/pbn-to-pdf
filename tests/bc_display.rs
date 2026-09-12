@@ -120,3 +120,71 @@ fn text_past_ascii_is_encoded_as_windows_1252() {
         "a bullet was written as UTF-8"
     );
 }
+
+/// Every string drawn with a builtin font, as its raw bytes.
+fn shown_strings(pdf: &[u8]) -> Vec<Vec<u8>> {
+    let doc = lopdf::Document::load_mem(pdf).unwrap();
+    let mut shown = Vec::new();
+    for object in doc.objects.values() {
+        let lopdf::Object::Stream(stream) = object else {
+            continue;
+        };
+        let Ok(bytes) = stream.decompressed_content() else {
+            continue;
+        };
+        let Ok(content) = lopdf::content::Content::decode(&bytes) else {
+            continue;
+        };
+        for op in content.operations.iter().filter(|op| op.operator == "Tj") {
+            if let Some(lopdf::Object::String(text, _)) = op.operands.first() {
+                shown.push(text.clone());
+            }
+        }
+    }
+    shown
+}
+
+/// Grant Robinson's slides write `x` for a spot card whose rank does not
+/// matter. The deal used to be dropped outright and nothing was drawn; now the
+/// hand is, the spots as `x` the way BridgeComposer prints them.
+#[test]
+fn x_spot_cards_are_drawn_as_x() {
+    let pbn = "[Board \"1\"]\n[Dealer \"N\"]\n[Deal \"N:Kx.Qxx.Qxxx.AJxx ... ... ...\"]\n";
+    let file = parse_pbn(pbn).unwrap();
+    let board = &file.boards[0];
+    let spades = board.deal.north.holding(pbn_to_pdf::model::Suit::Spades);
+    assert_eq!((spades.ranks.len(), spades.unknown), (1, 1));
+    // The hands written `...` are left out
+    assert!(board.hidden.east && board.hidden.south && board.hidden.west);
+
+    let pdf = render_boards(
+        &file.boards,
+        &[],
+        Layout::Analysis,
+        RenderOptions::default(),
+    )
+    .unwrap();
+    let shown = shown_strings(&pdf);
+    for holding in ["K x", "Q x x", "Q x x x", "A J x x"] {
+        assert!(
+            shown.iter().any(|s| s == holding.as_bytes()),
+            "{holding:?} not drawn"
+        );
+    }
+}
+
+/// A void is an em dash, as BridgeComposer prints it: byte 0x97 in the
+/// Windows-1252 the builtin fonts are drawn in.
+#[test]
+fn a_void_is_an_em_dash() {
+    let pbn = "[Board \"1\"]\n[Dealer \"N\"]\n[Deal \"N:AKQJT98765432... - - -\"]\n";
+    let file = parse_pbn(pbn).unwrap();
+    let pdf = render_boards(
+        &file.boards,
+        &[],
+        Layout::Analysis,
+        RenderOptions::default(),
+    )
+    .unwrap();
+    assert!(shown_strings(&pdf).iter().any(|s| s == &[0x97]));
+}

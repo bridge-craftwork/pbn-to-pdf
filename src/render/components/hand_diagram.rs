@@ -142,16 +142,7 @@ impl<'a> HandDiagramRenderer<'a> {
             .iter()
             .map(|suit| {
                 let holding = hand.holding(*suit);
-                let cards_str = if holding.is_void() {
-                    "-".to_string()
-                } else {
-                    holding
-                        .ranks
-                        .iter()
-                        .map(|r| r.display_str().to_string())
-                        .collect::<Vec<_>>()
-                        .join(" ")
-                };
+                let cards_str = holding_text(holding);
                 // Full line: "♠ A K Q J T 9 8 7 6 5" (symbol + space + spaced cards)
                 let line = format!("{} {}", suit.symbol(), cards_str);
                 measurer.measure_width_mm(&line, font_size)
@@ -476,16 +467,7 @@ impl<'a> HandDiagramRenderer<'a> {
             .iter()
             .map(|suit| {
                 let holding = hand.holding(*suit);
-                let cards_str = if holding.is_void() {
-                    "-".to_string()
-                } else {
-                    holding
-                        .ranks
-                        .iter()
-                        .map(|r| r.display_str().to_string())
-                        .collect::<Vec<_>>()
-                        .join(" ")
-                };
+                let cards_str = holding_text(holding);
                 if show_suit_symbol {
                     let line = format!("{} {}", suit.symbol(), cards_str);
                     measurer.measure_width_mm(&line, font_size)
@@ -534,16 +516,7 @@ impl<'a> HandDiagramRenderer<'a> {
 
         layer.set_fill_color(Color::Rgb(colors::BLACK));
 
-        let cards_str = if holding.is_void() {
-            "-".to_string()
-        } else {
-            holding
-                .ranks
-                .iter()
-                .map(|r| r.display_str().to_string())
-                .collect::<Vec<_>>()
-                .join(" ")
-        };
+        let cards_str = holding_text(holding);
 
         layer.use_text_builtin(&cards_str, self.settings.card_font_size, ox, oy, self.font);
     }
@@ -693,16 +666,7 @@ impl<'a> HandDiagramRenderer<'a> {
         // Render cards (in black) using regular font
         layer.set_fill_color(Color::Rgb(colors::BLACK));
 
-        let cards_str = if holding.is_void() {
-            "-".to_string()
-        } else {
-            holding
-                .ranks
-                .iter()
-                .map(|r| r.display_str().to_string())
-                .collect::<Vec<_>>()
-                .join(" ")
-        };
+        let cards_str = holding_text(holding);
 
         // Offset for cards (after suit symbol)
         let cards_x = Mm(ox.0 + 5.0);
@@ -879,4 +843,23 @@ impl<'a> HandDiagramRenderer<'a> {
             self.bold_font,
         );
     }
+}
+
+/// A holding as a diagram prints it: the ranks spaced out, then an `x` for
+/// each spot card whose rank the file does not give (`K x x`), or an em dash
+/// for a void -- both as BridgeComposer prints them.
+pub(crate) fn holding_text(holding: &crate::model::Holding) -> String {
+    if holding.is_void() {
+        return "\u{2014}".to_string();
+    }
+    holding
+        .ranks
+        .iter()
+        .map(|r| r.display_str().to_string())
+        .chain(std::iter::repeat_n(
+            "x".to_string(),
+            holding.unknown as usize,
+        ))
+        .collect::<Vec<_>>()
+        .join(" ")
 }
