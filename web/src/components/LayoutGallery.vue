@@ -67,7 +67,7 @@ function toggle(id) {
 .gallery {
   list-style: none; margin: 0; padding: 0;
   display: grid; gap: 0.6rem;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
+  grid-template-columns: repeat(7, minmax(0, 1fr));
 }
 @media (max-width: 1180px) { .gallery { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 @media (max-width: 640px) { .gallery { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
