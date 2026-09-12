@@ -121,6 +121,34 @@ fn text_past_ascii_is_encoded_as_windows_1252() {
     );
 }
 
+/// BridgeComposer draws the HCP box only when the file asks for it with
+/// `%BCOptions ShowHCP`; we used to draw it on every board (issue #30).
+///
+/// North holds 14 on this deal and South 13, and the box draws each seat's
+/// count as a string of its own.
+#[test]
+fn the_hcp_box_waits_for_show_hcp() {
+    let hcp_drawn = |headers: &[&str]| {
+        let file = parse_pbn(&BOARD.replace("FLAGS", "1f")).unwrap();
+        let headers: Vec<String> = headers.iter().map(|h| h.to_string()).collect();
+        let pdf = render_boards(
+            &file.boards,
+            &headers,
+            Layout::Analysis,
+            RenderOptions::default(),
+        )
+        .unwrap();
+        let shown = shown_strings(&pdf);
+        shown.iter().any(|s| s == "14".as_bytes()) && shown.iter().any(|s| s == "13".as_bytes())
+    };
+
+    assert!(!hcp_drawn(&[]), "no ShowHCP, so no HCP box");
+    assert!(
+        hcp_drawn(&["%BCOptions ShowHCP"]),
+        "ShowHCP asks for the box"
+    );
+}
+
 /// Every string drawn with a builtin font, as its raw bytes.
 fn shown_strings(pdf: &[u8]) -> Vec<Vec<u8>> {
     let doc = lopdf::Document::load_mem(pdf).unwrap();
