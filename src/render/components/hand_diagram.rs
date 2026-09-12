@@ -1,6 +1,8 @@
 use crate::config::Settings;
 use crate::model::card::RankExt;
-use crate::model::{Deal, Direction, Hand, HiddenHands, Suit, SUITS_DISPLAY_ORDER};
+use crate::model::{
+    BCFlags, Card, Deal, Direction, Hand, HiddenHands, PlaySequence, Suit, SUITS_DISPLAY_ORDER,
+};
 use printpdf::{BuiltinFont, Color, FontId, Mm, PaintMode, Rgb};
 
 use crate::render::helpers::colors::{self, SuitColors};
@@ -31,6 +33,21 @@ pub struct DiagramDisplayOptions {
     pub suits_present: Vec<Suit>,
     /// Whether to show suit symbols (false for single-suit fragments)
     pub show_suit_symbols: bool,
+    /// The trick the card table shows, by seat -- north, east, south, west --
+    /// when BCFlags asks for it (issue #30)
+    pub trick: Option<[Option<Card>; 4]>,
+    /// Every card played so far, which the hands draw greyed
+    pub played: Vec<Card>,
+}
+
+/// A seat's place in [`DiagramDisplayOptions::trick`]
+fn seat_index(seat: Direction) -> usize {
+    match seat {
+        Direction::North => 0,
+        Direction::East => 1,
+        Direction::South => 2,
+        Direction::West => 3,
+    }
 }
 
 impl DiagramDisplayOptions {
@@ -68,7 +85,49 @@ impl DiagramDisplayOptions {
             is_fragment,
             suits_present,
             show_suit_symbols,
+            trick: None,
+            played: Vec::new(),
         }
+    }
+
+    /// Add the trick in progress, when `BCFlags` bit 0x800 asks for it:
+    /// BridgeComposer draws the cards played so far in the card table and
+    /// greys them in the hands (issue #30).
+    pub fn with_trick(mut self, flags: Option<BCFlags>, play: Option<&PlaySequence>) -> Self {
+        let (Some(flags), Some(play)) = (flags, play) else {
+            return self;
+        };
+        if !flags.show_trick() {
+            return self;
+        }
+        // A play section can close with a trick that holds no card of its own:
+        // `*` ends one, and `-` only keeps a seat. The table shows the last
+        // trick that has a card in it.
+        let Some(trick) = play
+            .tricks
+            .iter()
+            .rev()
+            .find(|trick| trick.cards.iter().any(|card| card.is_some()))
+        else {
+            return self;
+        };
+
+        // A trick's cards run from its leader, clockwise
+        let mut cards: [Option<Card>; 4] = [None; 4];
+        let mut seat = trick.leader;
+        for card in trick.cards.iter() {
+            if let Some(card) = card {
+                cards[seat_index(seat)] = Some(*card);
+            }
+            seat = seat.next();
+        }
+        self.trick = Some(cards);
+        self.played = play
+            .tricks
+            .iter()
+            .flat_map(|trick| trick.cards.iter().flatten().copied())
+            .collect();
+        self
     }
 }
 
@@ -142,16 +201,7 @@ impl<'a> HandDiagramRenderer<'a> {
             .iter()
             .map(|suit| {
                 let holding = hand.holding(*suit);
-                let cards_str = if holding.is_void() {
-                    "-".to_string()
-                } else {
-                    holding
-                        .ranks
-                        .iter()
-                        .map(|r| r.display_str().to_string())
-                        .collect::<Vec<_>>()
-                        .join(" ")
-                };
+                let cards_str = holding_text(holding);
                 // Full line: "♠ A K Q J T 9 8 7 6 5" (symbol + space + spaced cards)
                 let line = format!("{} {}", suit.symbol(), cards_str);
                 measurer.measure_width_mm(&line, font_size)
@@ -271,7 +321,12 @@ impl<'a> HandDiagramRenderer<'a> {
         let north_y = oy.0;
         if !options.hidden.north {
             self.draw_debug_box(layer, north_x, north_y, north_w, hand_h);
-            self.render_hand_cards(layer, &deal.north, (Mm(north_x), Mm(north_y)));
+            self.render_hand_cards(
+                layer,
+                &deal.north,
+                (Mm(north_x), Mm(north_y)),
+                &options.played,
+            );
         }
 
         // Row 2: West hand | Compass | East hand (immediately below North)
@@ -281,7 +336,7 @@ impl<'a> HandDiagramRenderer<'a> {
         let west_x = ox.0;
         if !options.hidden.west {
             self.draw_debug_box(layer, west_x, row2_y, west_w, hand_h);
-            self.render_hand_cards(layer, &deal.west, (Mm(west_x), Mm(row2_y)));
+            self.render_hand_cards(layer, &deal.west, (Mm(west_x), Mm(row2_y)), &options.played);
         }
 
         // Compass rose - vertically centered with West/East hands
@@ -298,13 +353,13 @@ impl<'a> HandDiagramRenderer<'a> {
             compass_size,
             compass_size,
         );
-        self.render_compass(layer, (Mm(compass_center_x), Mm(compass_y)));
+        self.render_compass(layer, (Mm(compass_center_x), Mm(compass_y)), options);
 
         // East hand - to the right of compass
         let east_x = compass_center_x + compass_size / 2.0 + 3.5;
         if !options.hidden.east {
             self.draw_debug_box(layer, east_x, row2_y, east_w, hand_h);
-            self.render_hand_cards(layer, &deal.east, (Mm(east_x), Mm(row2_y)));
+            self.render_hand_cards(layer, &deal.east, (Mm(east_x), Mm(row2_y)), &options.played);
         }
 
         // Row 3: HCP box (below West) and South hand (next to HCP box)
@@ -320,7 +375,12 @@ impl<'a> HandDiagramRenderer<'a> {
         let south_y = hcp_box_y;
         if !options.hidden.south {
             self.draw_debug_box(layer, north_x, south_y, south_w, hand_h);
-            self.render_hand_cards(layer, &deal.south, (Mm(north_x), Mm(south_y)));
+            self.render_hand_cards(
+                layer,
+                &deal.south,
+                (Mm(north_x), Mm(south_y)),
+                &options.played,
+            );
         }
 
         // Return total height used
@@ -387,6 +447,7 @@ impl<'a> HandDiagramRenderer<'a> {
                 (Mm(north_x), Mm(north_y)),
                 suits_present,
                 show_suit_symbol,
+                &options.played,
             );
         }
 
@@ -412,6 +473,7 @@ impl<'a> HandDiagramRenderer<'a> {
                 (Mm(west_x), Mm(west_y)),
                 suits_present,
                 show_suit_symbol,
+                &options.played,
             );
         }
 
@@ -423,7 +485,7 @@ impl<'a> HandDiagramRenderer<'a> {
             compass_size,
             compass_size,
         );
-        self.render_compass(layer, (Mm(compass_center_x), Mm(compass_y)));
+        self.render_compass(layer, (Mm(compass_center_x), Mm(compass_y)), options);
 
         // East hand - left edge near compass right edge
         let east_x = compass_right + hand_compass_gap;
@@ -435,6 +497,7 @@ impl<'a> HandDiagramRenderer<'a> {
                 (Mm(east_x), Mm(west_y)),
                 suits_present,
                 show_suit_symbol,
+                &options.played,
             );
         }
 
@@ -455,6 +518,7 @@ impl<'a> HandDiagramRenderer<'a> {
                 (Mm(south_x), Mm(south_y)),
                 suits_present,
                 show_suit_symbol,
+                &options.played,
             );
         }
 
@@ -476,16 +540,7 @@ impl<'a> HandDiagramRenderer<'a> {
             .iter()
             .map(|suit| {
                 let holding = hand.holding(*suit);
-                let cards_str = if holding.is_void() {
-                    "-".to_string()
-                } else {
-                    holding
-                        .ranks
-                        .iter()
-                        .map(|r| r.display_str().to_string())
-                        .collect::<Vec<_>>()
-                        .join(" ")
-                };
+                let cards_str = holding_text(holding);
                 if show_suit_symbol {
                     let line = format!("{} {}", suit.symbol(), cards_str);
                     measurer.measure_width_mm(&line, font_size)
@@ -504,6 +559,7 @@ impl<'a> HandDiagramRenderer<'a> {
         origin: (Mm, Mm),
         suits_present: &[Suit],
         show_suit_symbol: bool,
+        played: &[Card],
     ) {
         let (ox, oy) = origin;
         let line_height = self.settings.line_height;
@@ -516,9 +572,15 @@ impl<'a> HandDiagramRenderer<'a> {
         for (i, suit) in suits_present.iter().enumerate() {
             let y = first_baseline - (i as f32 * line_height);
             if show_suit_symbol {
-                self.render_suit_line(layer, *suit, hand.holding(*suit), (Mm(ox.0), Mm(y)));
+                self.render_suit_line(layer, *suit, hand.holding(*suit), (Mm(ox.0), Mm(y)), played);
             } else {
-                self.render_cards_only(layer, hand.holding(*suit), (Mm(ox.0), Mm(y)));
+                self.render_cards_only(
+                    layer,
+                    *suit,
+                    hand.holding(*suit),
+                    (Mm(ox.0), Mm(y)),
+                    played,
+                );
             }
         }
     }
@@ -527,25 +589,57 @@ impl<'a> HandDiagramRenderer<'a> {
     fn render_cards_only(
         &self,
         layer: &mut LayerBuilder,
+        suit: Suit,
         holding: &crate::model::Holding,
         origin: (Mm, Mm),
+        played: &[Card],
+    ) {
+        self.draw_cards(layer, suit, holding, origin, played);
+    }
+
+    /// Draw a holding's cards, greying the ones already played (issue #30).
+    ///
+    /// A holding with none of them stays a single string, so every board
+    /// without a trick draws exactly as it did.
+    fn draw_cards(
+        &self,
+        layer: &mut LayerBuilder,
+        suit: Suit,
+        holding: &crate::model::Holding,
+        origin: (Mm, Mm),
+        played: &[Card],
     ) {
         let (ox, oy) = origin;
+        let font_size = self.settings.card_font_size;
 
-        layer.set_fill_color(Color::Rgb(colors::BLACK));
+        let has_played = holding
+            .ranks
+            .iter()
+            .any(|rank| played.contains(&Card { suit, rank: *rank }));
+        if !has_played {
+            layer.set_fill_color(Color::Rgb(colors::BLACK));
+            layer.use_text_builtin(holding_text(holding), font_size, ox, oy, self.font);
+            return;
+        }
 
-        let cards_str = if holding.is_void() {
-            "-".to_string()
-        } else {
-            holding
-                .ranks
-                .iter()
-                .map(|r| r.display_str().to_string())
-                .collect::<Vec<_>>()
-                .join(" ")
-        };
-
-        layer.use_text_builtin(&cards_str, self.settings.card_font_size, ox, oy, self.font);
+        let measurer = text_metrics::get_times_measurer();
+        let grey = self.settings.played_card_color;
+        let grey = Rgb::new(grey.0, grey.1, grey.2, None);
+        let mut x = ox.0;
+        for (i, rank) in holding.ranks.iter().enumerate() {
+            if i > 0 {
+                x += measurer.measure_width_mm(" ", font_size);
+            }
+            let text = rank.display_str().to_string();
+            let is_played = played.contains(&Card { suit, rank: *rank });
+            layer.set_fill_color(Color::Rgb(if is_played {
+                grey.clone()
+            } else {
+                colors::BLACK
+            }));
+            layer.use_text_builtin(&text, font_size, Mm(x), oy, self.font);
+            x += measurer.measure_width_mm(&text, font_size);
+        }
     }
 
     /// Render a single hand without compass (when only one hand is visible)
@@ -577,7 +671,7 @@ impl<'a> HandDiagramRenderer<'a> {
         let hand_x = ox.0 + hand_w + (compass_size - hand_w) / 2.0;
 
         self.draw_debug_box(layer, hand_x, oy.0, hand_width, hand_h);
-        self.render_hand_cards(layer, hand, (Mm(hand_x), oy));
+        self.render_hand_cards(layer, hand, (Mm(hand_x), oy), &options.played);
 
         // Return just the height used - layout handles spacing
         hand_h
@@ -628,6 +722,7 @@ impl<'a> HandDiagramRenderer<'a> {
             (Mm(hand_x), oy),
             suits_present,
             show_suit_symbol,
+            &options.played,
         );
 
         // Return just the height used - layout handles spacing
@@ -642,12 +737,18 @@ impl<'a> HandDiagramRenderer<'a> {
         origin: (Mm, Mm),
         _show_hcp: bool,
     ) {
-        self.render_hand_cards(layer, hand, origin);
+        self.render_hand_cards(layer, hand, origin, &[]);
     }
 
     /// Render hand cards only (no HCP)
     /// Origin is the top-left of the visual bounding box
-    fn render_hand_cards(&self, layer: &mut LayerBuilder, hand: &Hand, origin: (Mm, Mm)) {
+    fn render_hand_cards(
+        &self,
+        layer: &mut LayerBuilder,
+        hand: &Hand,
+        origin: (Mm, Mm),
+        played: &[Card],
+    ) {
         let (ox, oy) = origin;
         let line_height = self.settings.line_height;
 
@@ -662,7 +763,7 @@ impl<'a> HandDiagramRenderer<'a> {
         // Render each suit
         for (i, suit) in SUITS_DISPLAY_ORDER.iter().enumerate() {
             let y = first_baseline - (i as f32 * line_height);
-            self.render_suit_line(layer, *suit, hand.holding(*suit), (Mm(ox.0), Mm(y)));
+            self.render_suit_line(layer, *suit, hand.holding(*suit), (Mm(ox.0), Mm(y)), played);
         }
     }
 
@@ -673,6 +774,7 @@ impl<'a> HandDiagramRenderer<'a> {
         suit: Suit,
         holding: &crate::model::Holding,
         origin: (Mm, Mm),
+        played: &[Card],
     ) {
         let (ox, oy) = origin;
 
@@ -690,29 +792,8 @@ impl<'a> HandDiagramRenderer<'a> {
             self.symbol_font,
         );
 
-        // Render cards (in black) using regular font
-        layer.set_fill_color(Color::Rgb(colors::BLACK));
-
-        let cards_str = if holding.is_void() {
-            "-".to_string()
-        } else {
-            holding
-                .ranks
-                .iter()
-                .map(|r| r.display_str().to_string())
-                .collect::<Vec<_>>()
-                .join(" ")
-        };
-
         // Offset for cards (after suit symbol)
-        let cards_x = Mm(ox.0 + 5.0);
-        layer.use_text_builtin(
-            &cards_str,
-            self.settings.card_font_size,
-            cards_x,
-            oy,
-            self.font,
-        );
+        self.draw_cards(layer, suit, holding, (Mm(ox.0 + 5.0), oy), played);
     }
 
     /// Calculate compass box size based on font metrics
@@ -735,8 +816,81 @@ impl<'a> HandDiagramRenderer<'a> {
         (padding * 2.0) + (letter_size * 2.0) + inner_gap
     }
 
+    /// The card table with the trick in it: BridgeComposer draws it white,
+    /// with each card played at its player's seat (issue #30).
+    fn render_trick_table(
+        &self,
+        layer: &mut LayerBuilder,
+        center: (Mm, Mm),
+        trick: &[Option<Card>; 4],
+        show_suit_symbols: bool,
+    ) {
+        let (cx, cy) = center;
+        let measurer = text_metrics::get_times_measurer();
+        let font_size = self.settings.compass_font_size;
+        let cap_height = measurer.cap_height_mm(font_size);
+        let box_size = self.compass_box_size();
+        let half_box = box_size / 2.0;
+        let padding = 1.5;
+
+        layer.set_fill_color(Color::Rgb(colors::WHITE));
+        layer.add_rect(
+            Mm(cx.0 - half_box),
+            Mm(cy.0 - half_box),
+            Mm(cx.0 + half_box),
+            Mm(cy.0 + half_box),
+            PaintMode::Fill,
+        );
+        layer.set_outline_color(Color::Rgb(colors::BLACK));
+        layer.set_outline_thickness(0.5);
+        layer.add_rect(
+            Mm(cx.0 - half_box),
+            Mm(cy.0 - half_box),
+            Mm(cx.0 + half_box),
+            Mm(cy.0 + half_box),
+            PaintMode::Stroke,
+        );
+
+        for (seat, card) in trick.iter().enumerate() {
+            let Some(card) = card else { continue };
+            // A single-suit fragment prints bare ranks, as BridgeComposer does
+            let symbol = show_suit_symbols.then(|| card.suit.symbol().to_string());
+            let rank = card.rank.display_str().to_string();
+            let symbol_width = symbol
+                .as_ref()
+                .map_or(0.0, |s| measurer.measure_width_mm(s, font_size));
+            let width = symbol_width + measurer.measure_width_mm(&rank, font_size);
+            // North, east, south, west -- see `seat_index`
+            let (x, y) = match seat {
+                0 => (cx.0 - width / 2.0, cy.0 + half_box - padding - cap_height),
+                1 => (cx.0 + half_box - padding - width, cy.0 - cap_height / 2.0),
+                2 => (cx.0 - width / 2.0, cy.0 - half_box + padding),
+                _ => (cx.0 - half_box + padding, cy.0 - cap_height / 2.0),
+            };
+            if let Some(symbol) = &symbol {
+                layer.set_fill_color(Color::Rgb(self.colors.for_suit(&card.suit)));
+                layer.use_text(symbol, font_size, Mm(x), Mm(y), self.symbol_font);
+            }
+            layer.set_fill_color(Color::Rgb(colors::BLACK));
+            layer.use_text_builtin(&rank, font_size, Mm(x + symbol_width), Mm(y), self.font);
+        }
+    }
+
     /// Render compass rose with green filled box and white letters
-    fn render_compass(&self, layer: &mut LayerBuilder, center: (Mm, Mm)) {
+    fn render_compass(
+        &self,
+        layer: &mut LayerBuilder,
+        center: (Mm, Mm),
+        options: &DiagramDisplayOptions,
+    ) {
+        // `%ShowCardTable 0` leaves the space and draws nothing in it
+        if !self.settings.show_card_table {
+            return;
+        }
+        if let Some(trick) = options.trick {
+            self.render_trick_table(layer, center, &trick, options.show_suit_symbols);
+            return;
+        }
         let (cx, cy) = center;
         let measurer = text_metrics::get_times_measurer();
         let font_size = self.settings.compass_font_size;
@@ -875,4 +1029,23 @@ impl<'a> HandDiagramRenderer<'a> {
             self.bold_font,
         );
     }
+}
+
+/// A holding as a diagram prints it: the ranks spaced out, then an `x` for
+/// each spot card whose rank the file does not give (`K x x`), or an em dash
+/// for a void -- both as BridgeComposer prints them.
+pub(crate) fn holding_text(holding: &crate::model::Holding) -> String {
+    if holding.is_void() {
+        return "\u{2014}".to_string();
+    }
+    holding
+        .ranks
+        .iter()
+        .map(|r| r.display_str().to_string())
+        .chain(std::iter::repeat_n(
+            "x".to_string(),
+            holding.unknown as usize,
+        ))
+        .collect::<Vec<_>>()
+        .join(" ")
 }

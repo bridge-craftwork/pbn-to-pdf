@@ -7,9 +7,7 @@
 //! 3. South practice page (shows only South's hand)
 //! 4. Answers page (repeated for duplex printing)
 
-use printpdf::{
-    BuiltinFont, Color, FontId, Mm, PaintMode, PdfDocument, PdfPage, PdfSaveOptions, Rgb,
-};
+use printpdf::{BuiltinFont, Color, FontId, Mm, PaintMode, PdfPage, Rgb};
 
 use crate::config::Settings;
 use crate::error::RenderError;
@@ -20,8 +18,9 @@ use crate::model::{
 
 use crate::render::helpers::colors::{SuitColors, BLACK, WHITE};
 use crate::render::helpers::compress::compress_pdf;
+use crate::render::helpers::document::new_document;
 use crate::render::helpers::fonts::FontManager;
-use crate::render::helpers::layer::LayerBuilder;
+use crate::render::helpers::layer::{save_options, LayerBuilder};
 use crate::render::helpers::text_metrics::{
     get_helvetica_bold_measurer, get_helvetica_measurer, get_times_measurer, TextMeasure,
 };
@@ -264,7 +263,7 @@ impl BiddingSheetsRenderer {
             .map(|s| s.as_str())
             .unwrap_or("Bidding Practice");
 
-        let mut doc = PdfDocument::new(title);
+        let mut doc = new_document(title);
 
         // Load fonts - printpdf 0.8 handles subsetting automatically
         let fonts = FontManager::new(&mut doc)?;
@@ -318,7 +317,7 @@ impl BiddingSheetsRenderer {
         doc.with_pages(pages);
 
         let mut warnings = Vec::new();
-        let bytes = doc.save(&PdfSaveOptions::default(), &mut warnings);
+        let bytes = doc.save(&save_options(), &mut warnings);
 
         // Compress PDF streams to reduce file size
         let compressed = compress_pdf(bytes.clone()).unwrap_or(bytes);

@@ -5,8 +5,12 @@ pub struct LayoutSettings {
     pub margins: Option<Margins>,
     pub paper_size: Option<PaperSize>,
     pub show_hcp: bool,
-    pub show_card_table: bool,
-    pub show_board_labels: bool,
+    /// `%ShowCardTable`: `Some(false)` for 0, which leaves out the card table.
+    /// `None` when the file doesn't say, which shows it.
+    pub show_card_table: Option<bool>,
+    /// `%ShowBoardLabels`: `Some(false)` for 0, which leaves out the board
+    /// number, dealer and vulnerability. `None` when the file doesn't say.
+    pub show_board_labels: Option<bool>,
     pub justify: bool,
     /// Multi-column layout count (detected from %BoardsPerPage fit,N)
     pub column_count: u8,
@@ -135,6 +139,15 @@ impl FontSettings {
     }
 }
 
+/// `%CardTableColors #008000,#ffffff,#aaaaaa`: the card table, its lettering,
+/// and the colour a card already played is drawn in
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct CardTableColors {
+    pub table: (u8, u8, u8),
+    pub letters: (u8, u8, u8),
+    pub played: (u8, u8, u8),
+}
+
 /// Color settings for suits
 #[derive(Debug, Clone)]
 pub struct ColorSettings {
@@ -180,4 +193,5 @@ pub struct PbnMetadata {
     pub layout: LayoutSettings,
     pub fonts: FontSettings,
     pub colors: ColorSettings,
+    pub card_table_colors: Option<CardTableColors>,
 }

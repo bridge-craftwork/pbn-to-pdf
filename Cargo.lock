@@ -300,7 +300,7 @@ dependencies = [
 [[package]]
 name = "bridge-encodings"
 version = "0.1.0"
-source = "git+https://github.com/bridge-craftwork/bridge-encodings#a7efc04b0fb5d4d6859e52419b0681c16627c7b8"
+source = "git+https://github.com/bridge-craftwork/bridge-encodings#51a9911d7c064a756e79fdc38a4a7302a5a72515"
 dependencies = [
  "bridge-types",
  "thiserror",
@@ -309,7 +309,7 @@ dependencies = [
 [[package]]
 name = "bridge-types"
 version = "0.1.0"
-source = "git+https://github.com/bridge-craftwork/bridge-types#b9e675bbd90c5312f096931eaeb87d260f2a9314"
+source = "git+https://github.com/bridge-craftwork/bridge-types#12d57d64f07e79f758fc9e0cbf5bc06c4f6814a4"
 
 [[package]]
 name = "brotli-decompressor"

@@ -6,7 +6,7 @@
 //! - **2-up**: Two deals side by side on a landscape page
 //! - **4-up**: Four deals per page in a 2x2 grid (original layout)
 
-use printpdf::{Color, Mm, PdfDocument, PdfPage, PdfSaveOptions, Rgb};
+use printpdf::{Color, Mm, PdfDocument, PdfPage, Rgb};
 use std::collections::{HashMap, HashSet};
 
 use crate::config::Settings;
@@ -18,8 +18,9 @@ use crate::render::components::DeclarersPlanSmallRenderer;
 use crate::render::helpers::card_assets::{CardAssets, CardFace};
 use crate::render::helpers::colors::{SuitColors, BLUE, GREEN, RED};
 use crate::render::helpers::compress::compress_pdf;
+use crate::render::helpers::document::new_document;
 use crate::render::helpers::fonts::FontManager;
-use crate::render::helpers::layer::LayerBuilder;
+use crate::render::helpers::layer::{save_options, LayerBuilder};
 
 /// Separator line thickness
 const SEPARATOR_THICKNESS: f32 = 2.0;
@@ -240,7 +241,7 @@ fn finalize_pdf(doc: PdfDocument, pages: Vec<PdfPage>) -> Result<Vec<u8>, Render
     let mut doc = doc;
     doc.with_pages(pages);
     let mut warnings = Vec::new();
-    let bytes = doc.save(&PdfSaveOptions::default(), &mut warnings);
+    let bytes = doc.save(&save_options(), &mut warnings);
     let compressed = compress_pdf(bytes.clone()).unwrap_or(bytes);
     Ok(compressed)
 }
@@ -269,7 +270,7 @@ impl DeclarersPlan1UpRenderer {
             .map(|s| s.as_str())
             .unwrap_or("Declarer's Plan");
 
-        let mut doc = PdfDocument::new(title);
+        let mut doc = new_document(title);
         let fonts = FontManager::new(&mut doc)?;
         let card_assets = CardAssets::load_faces(&mut doc, &required_faces(boards))
             .map_err(|e| RenderError::CardAsset(e.to_string()))?;
@@ -353,7 +354,7 @@ impl DeclarersPlan2UpRenderer {
             .map(|s| s.as_str())
             .unwrap_or("Declarer's Plan");
 
-        let mut doc = PdfDocument::new(title);
+        let mut doc = new_document(title);
         let fonts = FontManager::new(&mut doc)?;
         let card_assets = CardAssets::load_faces(&mut doc, &required_faces(boards))
             .map_err(|e| RenderError::CardAsset(e.to_string()))?;
@@ -452,7 +453,7 @@ impl DeclarersPlanRenderer {
             .map(|s| s.as_str())
             .unwrap_or("Declarer's Plan Practice");
 
-        let mut doc = PdfDocument::new(title);
+        let mut doc = new_document(title);
         let fonts = FontManager::new(&mut doc)?;
         let card_assets = CardAssets::load_faces(&mut doc, &required_faces(boards))
             .map_err(|e| RenderError::CardAsset(e.to_string()))?;
