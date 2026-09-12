@@ -45,6 +45,7 @@ pbn-to-pdf [OPTIONS] <INPUT>
 | `--no-bidding` | Hide bidding table |
 | `--no-play` | Hide play sequence |
 | `--no-commentary` | Hide commentary text |
+| `--section-commentary` | Draw commentary that stands inside an auction or play section, which Bridge Composer leaves out |
 | `--hcp` | Show HCP point counts even when the PBN does not ask for them |
 | `--no-hcp` | Hide HCP point counts, even when the PBN asks for them |
 | `--no-page-furniture` | Leave out the page header or event headings and the `%PageFooter` lines, for pipelines that add their own |

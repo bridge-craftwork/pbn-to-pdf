@@ -49,6 +49,12 @@ pub struct Args {
     #[arg(long)]
     pub no_commentary: bool,
 
+    /// Draw commentary that stands inside an auction or play section, which
+    /// BridgeComposer leaves out
+    #[arg(long)]
+    pub section_commentary: bool,
+
+    /// Hide HCP point counts
     /// Show HCP point counts even when the PBN does not ask for them
     #[arg(long, conflicts_with = "no_hcp")]
     pub hcp: bool,
@@ -439,6 +445,7 @@ mod tests {
             no_bidding: false,
             no_play: false,
             no_commentary: false,
+            section_commentary: false,
             hcp: false,
             no_hcp: false,
             no_page_furniture: false,
@@ -479,6 +486,7 @@ mod tests {
             no_bidding: false,
             no_play: false,
             no_commentary: false,
+            section_commentary: false,
             hcp,
             no_hcp,
             no_page_furniture: false,
