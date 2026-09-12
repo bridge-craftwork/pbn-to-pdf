@@ -165,6 +165,11 @@ impl<'a> ColumnCommentary<'a> {
                     CommentarySlot::BeforeDeal => false,
                     CommentarySlot::Diagram => allowed(BCFlags::show_diagram_commentary),
                     CommentarySlot::Final => allowed(BCFlags::show_final_commentary),
+                    // Kept only when asked for, and then under the bit that
+                    // governed it before it had a slot of its own
+                    CommentarySlot::InSection => {
+                        settings.section_commentary && allowed(BCFlags::show_final_commentary)
+                    }
                 })
                 .collect();
             return shown;
@@ -178,6 +183,11 @@ impl<'a> ColumnCommentary<'a> {
                     shown.under_diagram.push(block)
                 }
                 CommentarySlot::Final if allowed(BCFlags::show_final_commentary) => {
+                    shown.below.push(block)
+                }
+                CommentarySlot::InSection
+                    if settings.section_commentary && allowed(BCFlags::show_final_commentary) =>
+                {
                     shown.below.push(block)
                 }
                 _ => {}

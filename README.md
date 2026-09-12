@@ -45,6 +45,7 @@ pbn-to-pdf [OPTIONS] <INPUT>
 | `--no-bidding` | Hide bidding table |
 | `--no-play` | Hide play sequence |
 | `--no-commentary` | Hide commentary text |
+| `--section-commentary` | Draw commentary that stands inside an auction or play section, which Bridge Composer leaves out |
 | `--no-hcp` | Hide HCP point counts |
 | `-b, --boards <RANGE>` | Board range to include (e.g., "1-16" or "5,8,12") |
 | `-t, --title [TITLE]` | Title for bidding sheets banner (overrides %HRTitleEvent; use with no value to hide) |

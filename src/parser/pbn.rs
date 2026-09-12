@@ -54,6 +54,19 @@ fn commentary_slot(anchor: Option<usize>, tag_order: &[String]) -> CommentarySlo
     let Some(before) = anchor else {
         return CommentarySlot::default();
     };
+    // A section's data runs until the next tag, so a block that followed
+    // `[Auction]` or `[Play]` stands inside it and BridgeComposer drops it,
+    // whatever tags the record carries later -- and whether or not the
+    // auction-commentary bit (0x80) is set, which does not bring it back.
+    if matches!(
+        before
+            .checked_sub(1)
+            .and_then(|i| tag_order.get(i))
+            .map(String::as_str),
+        Some("Auction" | "Play")
+    ) {
+        return CommentarySlot::InSection;
+    }
     let at = |name: &str| tag_order.iter().position(|t| t == name);
     let deal = at("Deal");
     // A block that `before` tags preceded stands ahead of the tag at index
@@ -242,5 +255,18 @@ mod tests {
             CommentarySlot::Final,
             "position unknown"
         );
+    }
+
+    /// An auction or play section swallows what stands inside it, which is
+    /// what BridgeComposer does with such a block.
+    #[test]
+    fn a_block_inside_a_section_belongs_to_that_section() {
+        let tags: Vec<String> = ["Event", "Board", "Deal", "Auction", "Play"]
+            .map(String::from)
+            .to_vec();
+        let slot = |before| commentary_slot(Some(before), &tags);
+        assert_eq!(slot(3), CommentarySlot::Diagram, "straight after [Deal]");
+        assert_eq!(slot(4), CommentarySlot::InSection, "inside the auction");
+        assert_eq!(slot(5), CommentarySlot::InSection, "inside the play");
     }
 }

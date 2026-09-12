@@ -32,6 +32,9 @@ pub struct RenderOptions {
     pub circle_promotable_winners: bool,
     /// Circle length winners in blue (priority 3)
     pub circle_length_winners: bool,
+    /// Draw commentary that stands inside an `[Auction]` or `[Play]` section.
+    /// Bridge Composer discards it, so this is off unless a caller asks.
+    pub section_commentary: bool,
 }
 
 /// High-level API for rendering boards to PDF.
@@ -90,6 +93,7 @@ pub fn render_boards(
     settings.circle_sure_winners = options.circle_sure_winners;
     settings.circle_promotable_winners = options.circle_promotable_winners;
     settings.circle_length_winners = options.circle_length_winners;
+    settings.section_commentary = options.section_commentary;
 
     // Route to the appropriate renderer based on layout
     match layout {

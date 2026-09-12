@@ -145,6 +145,17 @@ pub enum CommentarySlot {
     /// block of unknown position goes.
     #[default]
     Final,
+    /// Inside an `[Auction]` or `[Play]` section's data, which Bridge Composer
+    /// discards: a section runs until the next tag, and a block standing in
+    /// that run is section data.
+    ///
+    /// Probed against 5.118.2. A block between two auction lines, one between
+    /// two play lines, and one after the last auction line are all left out,
+    /// while a block that precedes `[Deal]` is drawn. That holds with the
+    /// auction-commentary bit (0x80) both clear and set -- `BCFlags 7f` and
+    /// `ff` render alike -- so this is what BridgeComposer does, not a guess at
+    /// which commentary bit governs it.
+    InSection,
 }
 
 #[derive(Debug, Clone)]

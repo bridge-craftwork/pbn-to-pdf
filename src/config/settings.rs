@@ -35,6 +35,9 @@ pub struct Settings {
     pub show_bidding: bool,
     pub show_play: bool,
     pub show_commentary: bool,
+    /// Draw commentary that stands inside an `[Auction]` or `[Play]` section.
+    /// BridgeComposer discards it, so this is off unless a pipeline asks.
+    pub section_commentary: bool,
     pub show_hcp: bool,
     pub justify: bool,
     pub debug_boxes: bool,
@@ -105,6 +108,7 @@ impl Default for Settings {
             show_bidding: true,
             show_play: true,
             show_commentary: true,
+            section_commentary: false,
             show_hcp: false,
             justify: false,
             debug_boxes: false,
@@ -175,6 +179,7 @@ impl Settings {
             show_bidding: args.show_bidding(),
             show_play: args.show_play(),
             show_commentary: args.show_commentary(),
+            section_commentary: args.section_commentary,
             show_hcp: args.show_hcp(),
             debug_boxes: args.debug_boxes,
             circle_sure_winners: args.circle_sure_winners,
