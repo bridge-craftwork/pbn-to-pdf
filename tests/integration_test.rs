@@ -1809,17 +1809,19 @@ fn preview_boards_renders_a_representative_first_page() {
 
     // Boards that actually carry a deal; the fixture has placeholder entries
     // whose hands parse to nothing.
-    let usable: Vec<pbn_to_pdf::Board> = pbn
+    let with_deals: Vec<pbn_to_pdf::Board> = pbn
         .boards
         .iter()
         .filter(|b| b.deal.north.card_count() == 13)
-        .take(12)
         .cloned()
         .collect();
     assert!(
-        usable.len() >= 8,
+        with_deals.len() >= 8,
         "fixture no longer has enough usable boards"
     );
+    // A hand record page holds eighteen, more than the fixture has: the page
+    // count is all that is measured, so repeat them.
+    let usable: Vec<pbn_to_pdf::Board> = with_deals.iter().cycle().take(20).cloned().collect();
 
     for layout in Layout::ALL {
         let n = layout.preview_boards() as usize;
@@ -1843,6 +1845,7 @@ fn preview_boards_renders_a_representative_first_page() {
                 | Layout::DeclarersPlan1up
                 | Layout::DeclarersPlan2up
                 | Layout::DealerSummary
+                | Layout::HandRecord
         );
         if fixed_geometry {
             assert_eq!(preview, 1, "{layout} preview should be a single page");
@@ -1909,6 +1912,84 @@ fn rendering_is_byte_reproducible_across_runs() {
         assert!(
             renders[0] == renders[1],
             "{layout} rendered the same size but different bytes -- output is not reproducible",
+        );
+    }
+}
+
+/// Floated commentary may run full width only once a whole line clears the
+/// content beside it (issue #29). Testing the baseline alone let a line whose
+/// baseline had just passed the boundary reach back above it, printing over the
+/// `Lead:` line under the auction.
+#[test]
+fn full_width_commentary_starts_below_the_floated_beside_content() {
+    use pbn_to_pdf::parser::commentary::parse_commentary;
+    use pbn_to_pdf::render::components::commentary::FloatLayout;
+    use pbn_to_pdf::render::components::CommentaryRenderer;
+    use pbn_to_pdf::render::get_times_measurer;
+    use printpdf::Op;
+
+    let settings = Settings::default();
+    let mut doc = PdfDocument::new("Float Boundary Test");
+    let fonts = FontManager::new(&mut doc).unwrap();
+    let renderer = CommentaryRenderer::new(
+        fonts.serif.regular,
+        fonts.serif.bold,
+        fonts.serif.italic,
+        fonts.serif.bold_italic,
+        fonts.symbol_font(),
+        &settings,
+    );
+    let block = parse_commentary(&"West surveys dummy and plays third hand high. ".repeat(20))
+        .expect("commentary parses");
+
+    // Put the boundary where the fourth line's baseline has passed it and its
+    // top has not: the case the old baseline test let through.
+    let start_y = 200.0;
+    let ascent = get_times_measurer().ascender_mm(settings.commentary_font_size);
+    let float_layout = FloatLayout {
+        float_until_y: start_y - 3.0 * settings.line_height + ascent / 2.0,
+        float_left: 110.0,
+        float_width: 90.0,
+        full_left: 20.0,
+        full_width: 180.0,
+    };
+
+    let mut layer = LayerBuilder::new();
+    renderer.render_float(
+        &mut layer,
+        &block,
+        (Mm(float_layout.float_left), Mm(start_y)),
+        &float_layout,
+    );
+
+    // The leftmost text on each line says whether it floated or ran full width.
+    let mut lines: Vec<(f32, f32)> = Vec::new(); // (baseline, leftmost x), in mm
+    for op in layer.ops() {
+        if let Op::SetTextCursor { pos } = op {
+            let (x, y) = (Mm::from(pos.x).0, Mm::from(pos.y).0);
+            match lines.iter_mut().find(|(ly, _)| (ly - y).abs() < 0.01) {
+                Some(line) => line.1 = line.1.min(x),
+                None => lines.push((y, x)),
+            }
+        }
+    }
+    let is_full_width = |x: f32| x < float_layout.float_left - 1.0;
+
+    assert!(
+        lines.iter().any(|&(_, x)| !is_full_width(x)),
+        "nothing floated"
+    );
+    assert!(
+        lines.iter().any(|&(_, x)| is_full_width(x)),
+        "nothing ran full width"
+    );
+    for &(y, x) in lines.iter().filter(|&&(_, x)| is_full_width(x)) {
+        assert!(
+            y + ascent < float_layout.float_until_y,
+            "a full-width line at x={x:.1} on baseline {y:.2} rises to {:.2}, above the \
+             floated-beside content ending at {:.2}",
+            y + ascent,
+            float_layout.float_until_y,
         );
     }
 }

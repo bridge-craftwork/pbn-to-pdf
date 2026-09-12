@@ -27,7 +27,7 @@ export default defineConfig({
     outDir: 'dist',
     rollupOptions: {
       output: {
-        // The renderer is ~21 MB of wasm, almost all of it card art, and it
+        // The renderer is about 17.7 MB of wasm (7.4 MB gzipped), and it
         // changes far less often than app code. Its own content-hashed chunk
         // means an app-code deploy does not re-download it for everyone.
         manualChunks(id) {

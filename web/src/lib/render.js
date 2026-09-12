@@ -1,6 +1,6 @@
 // The renderer, loaded on demand.
 //
-// The wasm module is large (~21 MB, almost all of it card art), so it is
+// The wasm module is large (about 7.4 MB gzipped), so it is
 // imported at first use rather than at page load: choosing a file, browsing the
 // library and reading the page all work while it is still arriving.
 
@@ -69,6 +69,7 @@ export const layoutLabel = (id) =>
     'declarers-plan-2up': "Declarer's plan — 2 per page",
     'declarers-plan': "Declarer's plan — 4 per page",
     'dealer-summary': 'Dealer summary',
+    'hand-record': 'Hand record',
   })[id] ?? id
 
 export const usesCardArt = (id) => id.startsWith('declarers-plan')
@@ -81,6 +82,7 @@ export const LAYOUT_ORDER = [
   'bidding-sheets',
   'dealer-summary',
   'analysis',
+  'hand-record',
 ]
 
 export const orderLayouts = (ids) =>

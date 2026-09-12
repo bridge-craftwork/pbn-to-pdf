@@ -130,7 +130,65 @@ fn adapt_board(src: bridge_types::Board) -> Board {
         }
     }
 
+    // A deal written with `x` spot cards did not parse; read it for display
+    if board.deal.is_empty() {
+        if let Some((deal, left_out)) = src.unparsed_deal.as_deref().and_then(display_deal) {
+            board.deal = deal;
+            board.hidden.north |= left_out.north;
+            board.hidden.east |= left_out.east;
+            board.hidden.south |= left_out.south;
+            board.hidden.west |= left_out.west;
+        }
+    }
+
     board
+}
+
+/// A `[Deal]` the reader could not parse, read for display only: `x` is a
+/// spot card whose rank the file does not give, and a hand written `...` or
+/// `-` is one the diagram leaves out, which comes back as hidden. `None` when
+/// the text is not a deal at all.
+fn display_deal(text: &str) -> Option<(Deal, HiddenHands)> {
+    use crate::model::{Direction, Rank, Suit};
+
+    let (first, hands) = text.trim().split_once(':')?;
+    let mut seat = Direction::from_char(first.trim().chars().next()?)?;
+    let hands: Vec<&str> = hands.split_whitespace().collect();
+    if hands.len() != 4 {
+        return None;
+    }
+
+    let mut deal = Deal::new();
+    let mut left_out = HiddenHands::default();
+    for text in hands {
+        if matches!(text, "..." | "-") {
+            match seat {
+                Direction::North => left_out.north = true,
+                Direction::East => left_out.east = true,
+                Direction::South => left_out.south = true,
+                Direction::West => left_out.west = true,
+            }
+        } else {
+            let suits: Vec<&str> = text.split('.').collect();
+            if suits.len() != 4 {
+                return None;
+            }
+            let mut hand = Hand::new();
+            let order = [Suit::Spades, Suit::Hearts, Suit::Diamonds, Suit::Clubs];
+            for (suit, cards) in order.into_iter().zip(suits) {
+                let holding = hand.holding_mut(suit);
+                for c in cards.chars() {
+                    match c {
+                        'x' | 'X' => holding.unknown += 1,
+                        _ => holding.add(Rank::from_char(c)?),
+                    }
+                }
+            }
+            deal.set_hand(seat, hand);
+        }
+        seat = seat.next();
+    }
+    Some((deal, left_out))
 }
 
 /// Regroup the four hands into per-suit holdings, which is how every diagram,

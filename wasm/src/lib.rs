@@ -47,6 +47,10 @@ pub struct WasmRenderOptions {
     /// Circle length winners in blue.
     #[wasm_bindgen(js_name = circleLengthWinners)]
     pub circle_length_winners: bool,
+    /// Leave out the page furniture -- event header or headings and the
+    /// `%PageFooter` lines. Off by default, matching Bridge Composer.
+    #[wasm_bindgen(js_name = omitPageFurniture)]
+    pub omit_page_furniture: bool,
 }
 
 #[wasm_bindgen(js_class = RenderOptions)]
@@ -67,6 +71,7 @@ impl From<WasmRenderOptions> for RenderOptions {
             // section data, which BridgeComposer leaves out. The browser has no
             // reason to ask for it, so it takes the matching default.
             section_commentary: false,
+            omit_page_furniture: options.omit_page_furniture,
         }
     }
 }
