@@ -91,7 +91,7 @@ jobs:
           ls dist/assets/*.wasm
           ls dist/assets/*.js
           # _headers is copied verbatim out of public/; without it the caching
-          # rules for the 21 MB engine would silently not be sent.
+          # rules for the engine (about 17.7 MB) would silently not be sent.
           test -f dist/_headers
           du -sh dist
 

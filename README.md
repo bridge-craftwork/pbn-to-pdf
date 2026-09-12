@@ -174,9 +174,11 @@ with a count you choose.
 After building for Node, `node wasm/verify.mjs` renders every layout and checks
 the resulting PDFs.
 
-The bundle is large — about 21 MB raw, 8.8 MB gzipped — because the 52 card SVGs
-are compiled in. Serve it compressed, and expect the fetch to dominate the first
-render.
+The bundle is large — about 17.7 MB raw, 7.4 MB gzipped: 7.3 MiB of compiled
+code and 9.6 MiB of static data, about half of which is the 52 card SVGs. Serve
+it compressed, and expect the fetch to dominate the first render. In the browser
+it reserves about 11 MiB of memory at load and peaks near 26 MiB rendering an
+8-board declarer's plan; `node wasm/measure-memory.mjs` reports the breakdown.
 
 Output matches the native build: every layout renders pixel-identical PDFs in
 both, verified by rasterizing and comparing.
