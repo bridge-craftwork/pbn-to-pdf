@@ -1,10 +1,8 @@
 use crate::config::Settings;
 use crate::error::RenderError;
 use crate::model::card::RankExt;
-use crate::model::{AuctionExt, BCFlags, BidSuit, Board, CommentaryBlock, CommentarySlot};
-use printpdf::{
-    BuiltinFont, Color, FontId, Mm, PaintMode, PdfDocument, PdfPage, PdfSaveOptions, Rgb,
-};
+use crate::model::{AuctionExt, BCFlags, BidSuit, Board, CommentaryBlock, CommentarySlot, Suit};
+use printpdf::{BuiltinFont, Color, FontId, Mm, PaintMode, PdfDocument, PdfPage, Rgb};
 
 use crate::render::components::bidding_table::BiddingTableRenderer;
 use crate::render::components::commentary::{CommentaryRenderer, FloatLayout};
@@ -12,7 +10,7 @@ use crate::render::components::hand_diagram::{DiagramDisplayOptions, HandDiagram
 use crate::render::helpers::colors::{SuitColors, BLACK};
 use crate::render::helpers::compress::compress_pdf;
 use crate::render::helpers::fonts::FontManager;
-use crate::render::helpers::layer::LayerBuilder;
+use crate::render::helpers::layer::{save_options, LayerBuilder};
 use crate::render::helpers::text_metrics::{self, get_times_measurer};
 
 /// Light gray color for debug boxes (component level)
@@ -106,12 +104,15 @@ impl BoardVisibility {
         let show_diagram_flag = flags.map(|f| f.show_diagram()).unwrap_or(true);
         Self {
             show_board: has_content
+                && settings.show_board_labels
                 && flags.map(|f| !f.hide_board()).unwrap_or(true)
                 && show_diagram_flag,
             show_dealer: has_content
+                && settings.show_board_labels
                 && flags.map(|f| !f.hide_dealer()).unwrap_or(true)
                 && show_diagram_flag,
             show_vulnerable: has_content
+                && settings.show_board_labels
                 && flags.map(|f| !f.hide_vulnerable()).unwrap_or(true)
                 && show_diagram_flag,
             show_diagram: !deal_is_empty && show_diagram_flag && !board.hidden.all_hidden(),
@@ -556,7 +557,7 @@ impl DocumentRenderer {
 
         // Save with auto-subsetting enabled (default)
         let mut warnings = Vec::new();
-        let bytes = doc.save(&PdfSaveOptions::default(), &mut warnings);
+        let bytes = doc.save(&save_options(), &mut warnings);
 
         // Compress PDF streams to reduce file size
         let compressed = compress_pdf(bytes.clone()).unwrap_or(bytes);
@@ -768,12 +769,18 @@ impl DocumentRenderer {
             .unwrap_or(false);
         let has_content = !deal_is_empty || has_auction;
         let show_diagram_flag = flags.map(|f| f.show_diagram()).unwrap_or(true);
-        let show_board =
-            has_content && flags.map(|f| !f.hide_board()).unwrap_or(true) && show_diagram_flag;
-        let show_dealer =
-            has_content && flags.map(|f| !f.hide_dealer()).unwrap_or(true) && show_diagram_flag;
-        let show_vulnerable =
-            has_content && flags.map(|f| !f.hide_vulnerable()).unwrap_or(true) && show_diagram_flag;
+        let show_board = has_content
+            && self.settings.show_board_labels
+            && flags.map(|f| !f.hide_board()).unwrap_or(true)
+            && show_diagram_flag;
+        let show_dealer = has_content
+            && self.settings.show_board_labels
+            && flags.map(|f| !f.hide_dealer()).unwrap_or(true)
+            && show_diagram_flag;
+        let show_vulnerable = has_content
+            && self.settings.show_board_labels
+            && flags.map(|f| !f.hide_vulnerable()).unwrap_or(true)
+            && show_diagram_flag;
         let show_diagram = !deal_is_empty && show_diagram_flag && !board.hidden.all_hidden();
         let show_auction = has_auction
             && flags.map(|f| f.show_auction()).unwrap_or(true)
@@ -1273,7 +1280,6 @@ impl DocumentRenderer {
         // Build title lines and measure widths
         // Show board info if deal has cards OR there's an auction (for exercise boards)
         let font_size = self.settings.body_font_size;
-        let mut title_lines: Vec<String> = Vec::new();
         let deal_is_empty = board.deal.is_empty();
         let has_auction = board
             .auction
@@ -1282,16 +1288,28 @@ impl DocumentRenderer {
             .unwrap_or(false);
         let has_content = !deal_is_empty || has_auction;
 
-        if has_content {
-            if let Some(ref board_id) = board.board_id {
-                // Use board label format from settings (e.g., "Board %" -> "Board 1", "%)" -> "1)")
-                let label = self.settings.board_label_format.replace('%', board_id);
-                title_lines.push(label);
-            }
-            if let Some(dealer) = board.dealer {
-                title_lines.push(format!("{} Deals", dealer));
-            }
-            title_lines.push(board.vulnerable.to_string());
+        // Up to three lines: board label (bold italic), dealer, vulnerability.
+        // BCFlags hides each one on its own, and `%ShowBoardLabels 0` hides all
+        // three -- BridgeComposer honours both on one-board-per-page files too.
+        let flags = board.bc_flags;
+        let show_labels = has_content && self.settings.show_board_labels;
+        let shown =
+            |hidden: fn(&BCFlags) -> bool| show_labels && !flags.as_ref().is_some_and(hidden);
+        let mut title_lines: Vec<(String, BuiltinFont)> = Vec::new();
+        if let Some(board_id) = board
+            .board_id
+            .as_ref()
+            .filter(|_| shown(BCFlags::hide_board))
+        {
+            // Use board label format from settings (e.g., "Board %" -> "Board 1", "%)" -> "1)")
+            let label = self.settings.board_label_format.replace('%', board_id);
+            title_lines.push((label, hand_record_fonts.bold_italic));
+        }
+        if let Some(dealer) = board.dealer.filter(|_| shown(BCFlags::hide_dealer)) {
+            title_lines.push((format!("{} Deals", dealer), hand_record_fonts.regular));
+        }
+        if shown(BCFlags::hide_vulnerable) {
+            title_lines.push((board.vulnerable.to_string(), hand_record_fonts.regular));
         }
 
         let num_lines = title_lines.len();
@@ -1299,58 +1317,29 @@ impl DocumentRenderer {
         // Calculate actual width by measuring all lines
         let title_width = title_lines
             .iter()
-            .map(|line| measurer.measure_width_mm(line, font_size))
+            .map(|(line, _)| measurer.measure_width_mm(line, font_size))
             .fold(0.0_f32, |max, w| max.max(w));
 
         // Title box height: cap_height + (num_lines - 1) gaps + descender
-        let title_height = cap_height + (num_lines - 1) as f32 * line_height + descender;
+        let title_height =
+            cap_height + num_lines.saturating_sub(1) as f32 * line_height + descender;
 
         // Draw debug box around title area
         self.draw_debug_box(layer, title_x, title_start_y, title_width, title_height);
 
-        // Render title text with cap-height offset (only if deal has cards)
+        // Render title text with cap-height offset
         let first_baseline = title_start_y - cap_height;
-        let mut current_line = 0;
 
         layer.set_fill_color(Color::Rgb(BLACK));
 
-        if has_content {
-            // Line 1: Board label (bold italic) - use hand_record font
-            if let Some(ref board_id) = board.board_id {
-                let y = first_baseline - (current_line as f32 * line_height);
-                // Use board label format from settings (e.g., "Board %" -> "Board 1", "%)" -> "1)")
-                let label = self.settings.board_label_format.replace('%', board_id);
-                layer.use_text_builtin(
-                    label,
-                    self.settings.body_font_size,
-                    Mm(title_x),
-                    Mm(y),
-                    hand_record_fonts.bold_italic,
-                );
-                current_line += 1;
-            }
-
-            // Line 2: Dealer - use hand_record font
-            if let Some(dealer) = board.dealer {
-                let y = first_baseline - (current_line as f32 * line_height);
-                layer.use_text_builtin(
-                    format!("{} Deals", dealer),
-                    self.settings.body_font_size,
-                    Mm(title_x),
-                    Mm(y),
-                    hand_record_fonts.regular,
-                );
-                current_line += 1;
-            }
-
-            // Line 3: Vulnerability - use hand_record font
-            let y = first_baseline - (current_line as f32 * line_height);
+        for (i, (line, font)) in title_lines.iter().enumerate() {
+            let y = first_baseline - (i as f32 * line_height);
             layer.use_text_builtin(
-                board.vulnerable.to_string(),
+                line,
                 self.settings.body_font_size,
                 Mm(title_x),
                 Mm(y),
-                hand_record_fonts.regular,
+                *font,
             );
         }
 

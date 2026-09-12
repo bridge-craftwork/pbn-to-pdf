@@ -14,6 +14,12 @@ const SUPERSCRIPT_RATIO: f32 = 0.65;
 /// Vertical offset for superscript as fraction of font size
 const SUPERSCRIPT_RISE: f32 = 0.4;
 
+/// Whether an annotation is a suffix marker (`!`, `?`, `!?`, `??`, ...) rather
+/// than a note reference.
+fn is_suffix_annotation(annotation: &str) -> bool {
+    !annotation.is_empty() && annotation.chars().all(|c| c == '!' || c == '?')
+}
+
 /// Renderer for bidding tables
 pub struct BiddingTableRenderer<'a> {
     font: BuiltinFont,
@@ -546,8 +552,20 @@ impl<'a> BiddingTableRenderer<'a> {
                     pos.1,
                     self.font,
                 );
+            } else if is_suffix_annotation(annotation) {
+                // `!` and `?` belong to the call and follow it at full size
+                // ("Pass?"), as BridgeComposer prints them; only note
+                // references are raised
+                layer.set_fill_color(Color::Rgb(BLACK));
+                layer.use_text_builtin(
+                    annotation,
+                    self.settings.body_font_size,
+                    Mm(pos.0 .0 + call_width),
+                    pos.1,
+                    self.font,
+                );
             } else {
-                // For other calls, render as superscript
+                // Note references render as superscript
                 let sup_x = Mm(pos.0 .0 + call_width);
                 let sup_y =
                     Mm(pos.1 .0 + (self.settings.body_font_size * SUPERSCRIPT_RISE * 0.352778));
@@ -837,5 +855,20 @@ impl<'a> BiddingTableRenderer<'a> {
 
         // Return total width used
         current_x - x
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::is_suffix_annotation;
+
+    #[test]
+    fn suffix_markers_are_not_note_references() {
+        for marker in ["!", "?", "!!", "??", "!?", "?!"] {
+            assert!(is_suffix_annotation(marker), "{marker}");
+        }
+        for reference in ["1", "12", ""] {
+            assert!(!is_suffix_annotation(reference), "{reference:?}");
+        }
     }
 }
