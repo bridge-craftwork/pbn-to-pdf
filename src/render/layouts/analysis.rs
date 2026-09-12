@@ -2,13 +2,16 @@ use crate::config::Settings;
 use crate::error::RenderError;
 use crate::model::card::RankExt;
 use crate::model::{AuctionExt, BCFlags, BidSuit, Board, Direction, Suit, SUITS_DISPLAY_ORDER};
-use printpdf::{BuiltinFont, Color, FontId, Mm, PaintMode, PdfDocument, PdfPage, Rgb};
+use printpdf::{BuiltinFont, Color, FontId, Mm, PaintMode, PdfPage, Rgb};
 
 use crate::render::components::bidding_table::BiddingTableRenderer;
 use crate::render::components::commentary::{CommentaryRenderer, FloatLayout};
-use crate::render::components::hand_diagram::{DiagramDisplayOptions, HandDiagramRenderer};
+use crate::render::components::hand_diagram::{
+    holding_text, DiagramDisplayOptions, HandDiagramRenderer,
+};
 use crate::render::helpers::colors::{SuitColors, BLACK};
 use crate::render::helpers::compress::compress_pdf;
+use crate::render::helpers::document::new_document;
 use crate::render::helpers::fonts::FontManager;
 use crate::render::helpers::layer::{save_options, LayerBuilder};
 use crate::render::helpers::text_metrics::{self, get_times_measurer};
@@ -214,7 +217,8 @@ impl DocumentRenderer {
 
         // Diagram height
         if visibility.show_diagram {
-            let diagram_options = DiagramDisplayOptions::from_deal(&board.deal, &board.hidden);
+            let diagram_options = DiagramDisplayOptions::from_deal(&board.deal, &board.hidden)
+                .with_trick(board.bc_flags, board.play.as_ref());
 
             // Check for single-card deal - renders just a rank number, not a full diagram
             let is_single_card = board.deal.get_single_visible_card(&board.hidden).is_some();
@@ -455,7 +459,7 @@ impl DocumentRenderer {
             .map(|s| s.as_str())
             .unwrap_or("Bridge Hands");
 
-        let mut doc = PdfDocument::new(title);
+        let mut doc = new_document(title);
 
         // Load fonts - printpdf 0.8 handles subsetting automatically
         let fonts = FontManager::new(&mut doc)?;
@@ -820,7 +824,8 @@ impl DocumentRenderer {
             let diagram_x = column_x;
 
             // Compute display options - all visibility decisions are made here
-            let diagram_options = DiagramDisplayOptions::from_deal(&board.deal, &board.hidden);
+            let diagram_options = DiagramDisplayOptions::from_deal(&board.deal, &board.hidden)
+                .with_trick(board.bc_flags, board.play.as_ref());
 
             // Check for single-card deal - render just the rank number instead of a full diagram
             if let Some((_suit, rank)) = board.deal.get_single_visible_card(&board.hidden) {
@@ -1206,7 +1211,8 @@ impl DocumentRenderer {
         // Render diagram centered if enabled
         if show_diagram {
             // Calculate diagram width to center it
-            let diagram_options = DiagramDisplayOptions::from_deal(&board.deal, &board.hidden);
+            let diagram_options = DiagramDisplayOptions::from_deal(&board.deal, &board.hidden)
+                .with_trick(board.bc_flags, board.play.as_ref());
             let hand_renderer = HandDiagramRenderer::new(
                 diagram_fonts.regular,
                 diagram_fonts.bold,
@@ -1315,13 +1321,7 @@ impl DocumentRenderer {
                     let hand_width = suits_to_show
                         .iter()
                         .map(|suit| {
-                            let holding = hand.holding(*suit);
-                            let cards_str = holding
-                                .ranks
-                                .iter()
-                                .map(|r| r.display_str().to_string())
-                                .collect::<Vec<_>>()
-                                .join(" ");
+                            let cards_str = holding_text(hand.holding(*suit));
                             if show_suit_symbols {
                                 let line = format!("{} {}", suit.symbol(), cards_str);
                                 hand_measurer.measure_width_mm(&line, self.settings.card_font_size)
@@ -1367,12 +1367,7 @@ impl DocumentRenderer {
 
                         // Render cards
                         layer.set_fill_color(Color::Rgb(BLACK));
-                        let cards_str = holding
-                            .ranks
-                            .iter()
-                            .map(|r| r.display_str().to_string())
-                            .collect::<Vec<_>>()
-                            .join(" ");
+                        let cards_str = holding_text(holding);
                         layer.use_text_builtin(
                             &cards_str,
                             self.settings.card_font_size,
@@ -1770,7 +1765,8 @@ impl DocumentRenderer {
         // Only render diagram if deal has cards
         if !deal_is_empty {
             // Compute display options - all visibility decisions are made here
-            let diagram_options = DiagramDisplayOptions::from_deal(&board.deal, &board.hidden);
+            let diagram_options = DiagramDisplayOptions::from_deal(&board.deal, &board.hidden)
+                .with_trick(board.bc_flags, board.play.as_ref());
 
             let hand_renderer = HandDiagramRenderer::new(
                 diagram_fonts.regular,
