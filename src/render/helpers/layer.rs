@@ -5,10 +5,24 @@
 
 use std::borrow::Cow;
 
+use super::text_metrics::{winansi_byte, winansi_char};
 use printpdf::{
-    BuiltinFont, Color, CurTransMat, FontId, LinePoint, Mm, Op, PaintMode, PdfFontHandle, Point,
-    Polygon, PolygonRing, Pt, TextItem, WindingOrder, XObjectId, XObjectTransform,
+    BuiltinFont, Color, CurTransMat, DictItem, FontId, LinePoint, Mm, Op, PaintMode, PdfFontHandle,
+    PdfSaveOptions, Point, Polygon, PolygonRing, Pt, TextItem, WindingOrder, XObjectId,
+    XObjectTransform,
 };
+
+/// Save options for every document.
+///
+/// `secure: false` lets through the raw `Tj` that [`LayerBuilder::use_text_builtin`]
+/// writes for text past ASCII; printpdf's default drops unknown operators.
+/// Nothing else in printpdf reads the flag.
+pub fn save_options() -> PdfSaveOptions {
+    PdfSaveOptions {
+        secure: false,
+        ..PdfSaveOptions::default()
+    }
+}
 
 /// A builder that collects PDF operations
 ///
@@ -73,8 +87,9 @@ impl LayerBuilder {
     /// Uses the Standard 14 PDF fonts (Times-Roman, Helvetica, etc.)
     /// which don't need to be embedded in the PDF.
     ///
-    /// Note: Builtin fonts use WinAnsiEncoding (Windows-1252), so Unicode
-    /// characters outside this range will be converted to ASCII equivalents.
+    /// Builtin fonts use WinAnsiEncoding (Windows-1252). Characters it can
+    /// encode are drawn as themselves; the rest fall back to an ASCII
+    /// look-alike (see `winansi_char`).
     pub fn use_text_builtin<S: Into<String>>(
         &mut self,
         text: S,
@@ -85,7 +100,38 @@ impl LayerBuilder {
     ) {
         let text_str = text.into();
         let sanitized = sanitize_for_winansi(&text_str);
-        self.use_text_with_handle(sanitized, font_size, x, y, PdfFontHandle::Builtin(font));
+        if sanitized.is_ascii() {
+            self.use_text_with_handle(sanitized, font_size, x, y, PdfFontHandle::Builtin(font));
+            return;
+        }
+        if sanitized.is_empty() {
+            return;
+        }
+
+        // printpdf hands builtin-font text to lopdf as UTF-8 bytes, which the
+        // viewer then reads as WinAnsi: a bullet prints as "â€¢". So past ASCII
+        // we encode Windows-1252 ourselves and show it with a raw `Tj` -- the
+        // operator, and the hex form, printpdf itself writes for such bytes.
+        let bytes: Vec<u8> = sanitized.chars().filter_map(winansi_byte).collect();
+        self.ops.push(Op::StartTextSection);
+        self.ops.push(Op::SetTextCursor {
+            pos: Point {
+                x: x.into(),
+                y: y.into(),
+            },
+        });
+        self.ops.push(Op::SetFont {
+            size: Pt(font_size),
+            font: PdfFontHandle::Builtin(font),
+        });
+        self.ops.push(Op::Unknown {
+            key: "Tj".to_string(),
+            value: vec![DictItem::String {
+                data: bytes,
+                literal: false,
+            }],
+        });
+        self.ops.push(Op::EndTextSection);
     }
 
     /// Draw text at a specific position using any font handle
@@ -621,100 +667,26 @@ impl LayerBuilder {
 /// Converts Unicode characters to their Windows-1252 equivalents where possible,
 /// or falls back to ASCII approximations for characters not in the encoding.
 fn sanitize_for_winansi(text: &str) -> Cow<'_, str> {
-    // Fast path: check if all characters are ASCII
-    if text.is_ascii() {
+    if text.chars().all(|c| winansi_char(c) == Some(c)) {
         return Cow::Borrowed(text);
     }
+    Cow::Owned(text.chars().filter_map(winansi_char).collect())
+}
 
-    // Slow path: convert Unicode characters
-    let mut result = String::with_capacity(text.len());
+#[cfg(test)]
+mod tests {
+    use super::sanitize_for_winansi;
 
-    for c in text.chars() {
-        if c.is_ascii() {
-            result.push(c);
-        } else {
-            // Map Unicode characters to Windows-1252 or ASCII fallbacks
-            let replacement = match c {
-                // Typographic quotes
-                '\u{2018}' | '\u{2019}' => '\'', // Left/right single quote → ASCII apostrophe
-                '\u{201C}' | '\u{201D}' => '"',  // Left/right double quote → ASCII quote
-                '\u{201A}' => ',',               // Single low quote → comma
-                '\u{201E}' => '"',               // Double low quote → ASCII quote
-
-                // Dashes
-                '\u{2013}' => '-', // En dash → hyphen
-                '\u{2014}' => '-', // Em dash → hyphen (could use "--" but single char is safer)
-                '\u{2015}' => '-', // Horizontal bar → hyphen
-
-                // Ellipsis
-                '\u{2026}' => {
-                    result.push_str("...");
-                    continue;
-                }
-
-                // Bullets and symbols
-                '\u{2022}' => '*', // Bullet → asterisk
-                '\u{2023}' => '>', // Triangular bullet → greater than
-                '\u{2027}' => '-', // Hyphenation point → hyphen
-
-                // Spaces
-                '\u{00A0}' => ' ', // Non-breaking space → regular space
-                '\u{2002}' => ' ', // En space → regular space
-                '\u{2003}' => ' ', // Em space → regular space
-                '\u{2009}' => ' ', // Thin space → regular space
-
-                // Math symbols (keep some that are in Windows-1252)
-                '\u{00D7}' => 'x', // Multiplication sign (×) → x
-                '\u{00F7}' => '/', // Division sign (÷) → slash
-                '\u{2212}' => '-', // Minus sign → hyphen
-
-                // Fractions (Windows-1252 has ¼ ½ ¾ at 0xBC, 0xBD, 0xBE)
-                // But printpdf may not handle them correctly, so use text
-                '\u{00BC}' => {
-                    result.push_str("1/4");
-                    continue;
-                }
-                '\u{00BD}' => {
-                    result.push_str("1/2");
-                    continue;
-                }
-                '\u{00BE}' => {
-                    result.push_str("3/4");
-                    continue;
-                }
-
-                // Trademark and copyright (in Windows-1252 but may not render well)
-                '\u{2122}' => {
-                    result.push_str("(TM)");
-                    continue;
-                }
-                '\u{00A9}' => {
-                    result.push_str("(C)");
-                    continue;
-                }
-                '\u{00AE}' => {
-                    result.push_str("(R)");
-                    continue;
-                }
-
-                // Degree symbol - commonly used
-                '\u{00B0}' => 'o', // Degree → lowercase o (approximation)
-
-                // Common Latin-1 supplement characters (most are in Windows-1252)
-                c if ('\u{00A1}'..='\u{00FF}').contains(&c) => c, // Keep Latin-1 supplement
-
-                // Skip suit symbols (these should use the symbol font, not builtin)
-                '\u{2660}' | '\u{2663}' | '\u{2665}' | '\u{2666}' => {
-                    // Spade, club, heart, diamond - skip if they somehow get here
-                    continue;
-                }
-
-                // Default: skip unknown characters (or use replacement char)
-                _ => '?',
-            };
-            result.push(replacement);
-        }
+    #[test]
+    fn windows_1252_text_passes_through_unchanged() {
+        // Grant Robinson's slides: bullets, en dashes, curly quotes, an ellipsis
+        let text = "\u{2022} Two-over-one \u{2013} \u{201C}no man\u{2019}s land\u{201D}\u{2026} caf\u{00E9}";
+        assert_eq!(sanitize_for_winansi(text), text);
     }
 
-    Cow::Owned(result)
+    #[test]
+    fn characters_outside_windows_1252_fall_back() {
+        assert_eq!(sanitize_for_winansi("6\u{202F}pts"), "6 pts");
+        assert_eq!(sanitize_for_winansi("1\u{2660}"), "1");
+    }
 }
