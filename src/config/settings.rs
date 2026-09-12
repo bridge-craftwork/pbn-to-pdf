@@ -180,10 +180,10 @@ impl Settings {
         let (margin_lr, margin_tb) = if let Some(preset) = args.margins {
             let m = preset.size_mm();
             (m, m)
-        } else if args.layout == Layout::BiddingSheets {
+        } else if args.layout() == Layout::BiddingSheets {
             // Bidding sheets use standard margins by default
             (BIDDING_SHEETS_MARGIN, BIDDING_SHEETS_MARGIN)
-        } else if args.layout.is_declarers_plan() {
+        } else if args.layout().is_declarers_plan() {
             // Declarer's plan uses 0.5" left/right, 1.0" top/bottom
             (DECLARERS_PLAN_MARGIN_LR, DECLARERS_PLAN_MARGIN_TB)
         } else {
@@ -200,7 +200,7 @@ impl Settings {
             margin_right: margin_lr,
             boards_per_page: args.boards_per_page,
             margin_preset: args.margins,
-            layout: args.layout,
+            layout: args.layout(),
             show_bidding: args.show_bidding(),
             show_play: args.show_play(),
             show_commentary: args.show_commentary(),
@@ -225,7 +225,7 @@ impl Settings {
                 (DECLARERS_PLAN_MARGIN_LR, DECLARERS_PLAN_MARGIN_TB)
             }
             Layout::DealerSummary => (DECLARERS_PLAN_MARGIN_LR, DECLARERS_PLAN_MARGIN_TB),
-            Layout::Analysis => (DEFAULT_PAGE_MARGIN, DEFAULT_PAGE_MARGIN),
+            Layout::Analysis | Layout::HandRecord => (DEFAULT_PAGE_MARGIN, DEFAULT_PAGE_MARGIN),
         };
 
         Self {
@@ -248,7 +248,10 @@ impl Settings {
         // Apply PBN margins only if:
         // 1. No CLI margin override was specified, AND
         // 2. Layout is Analysis (bidding sheets and declarer's plan ignore embedded margins)
-        if self.margin_preset.is_none() && self.layout == Layout::Analysis {
+        // The hand record is BridgeComposer's too, and follows them as well.
+        if self.margin_preset.is_none()
+            && matches!(self.layout, Layout::Analysis | Layout::HandRecord)
+        {
             if let Some(ref margins) = metadata.layout.margins {
                 self.margin_top = margins.top;
                 self.margin_bottom = margins.bottom;

@@ -7,11 +7,11 @@ use pbn_to_pdf::config::Settings;
 use pbn_to_pdf::parser::parse_pbn;
 use pbn_to_pdf::render::{
     generate_pdf, BiddingSheetsRenderer, DealerSummaryRenderer, DeclarersPlan1UpRenderer,
-    DeclarersPlan2UpRenderer, DeclarersPlanRenderer,
+    DeclarersPlan2UpRenderer, DeclarersPlanRenderer, HandRecordRenderer,
 };
 
 fn main() -> Result<()> {
-    let args = Args::parse();
+    let mut args = Args::parse();
 
     // Initialize logging
     env_logger::Builder::new()
@@ -30,6 +30,11 @@ fn main() -> Result<()> {
     let pbn_file = parse_pbn(&pbn_content).with_context(|| "Failed to parse PBN content")?;
 
     log::info!("Parsed {} boards from PBN file", pbn_file.boards.len());
+
+    // No --layout: the file may ask for BridgeComposer's hand record
+    if args.layout.is_none() {
+        args.layout = Some(Layout::default_for(&pbn_file.metadata));
+    }
 
     // Filter boards if range specified
     let boards = if let Some(ref range_spec) = args.boards {
@@ -95,6 +100,9 @@ fn main() -> Result<()> {
                 .render(&boards)
                 .with_context(|| "Failed to generate dealer summary PDF")?
         }
+        Layout::HandRecord => HandRecordRenderer::new(settings)
+            .render(&boards)
+            .with_context(|| "Failed to generate hand record PDF")?,
     };
 
     // Write output

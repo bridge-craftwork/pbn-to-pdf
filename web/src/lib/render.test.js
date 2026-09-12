@@ -5,7 +5,7 @@ describe('layoutLabel', () => {
   it('names every layout the engine reports', () => {
     for (const id of [
       'analysis', 'bidding-sheets', 'declarers-plan-1up',
-      'declarers-plan-2up', 'declarers-plan', 'dealer-summary',
+      'declarers-plan-2up', 'declarers-plan', 'dealer-summary', 'hand-record',
     ]) {
       expect(layoutLabel(id)).not.toBe(id)
     }

@@ -169,7 +169,7 @@ The page is laid out so the generated PDF is visible without scrolling. That is
 what drives three choices that would otherwise look arbitrary. The lesson
 library and the enlarged previews are `<dialog>` modals, not page sections: both
 are big, both are consulted briefly, and on the page they pushed the result
-below the fold *and* put a scroll region inside a scroll region. All six layouts
+below the fold *and* put a scroll region inside a scroll region. All seven layouts
 sit on one row, which makes each thumbnail too small to read a diagram in —
 hence clicking one, which re-renders that preview into a modal PDF viewer rather
 than upscaling the thumbnail (one preview is a few milliseconds, against holding
@@ -203,7 +203,7 @@ is a real capacity, and the integration test asserts it by rendering: that many
 boards fill one page and one more spills. For `analysis` and `bidding-sheets` it
 is a *sample*, because their paging follows commentary and auction length
 respectively — consumers render the preview and show only its first page. All
-six layouts preview in ~80 ms together, against ~740 ms for one full lesson.
+seven layouts preview in ~90 ms together, against ~740 ms for one full lesson.
 
 Testing has three layers, because each misses what the others catch:
 `npm test` (vitest) covers the pure logic, `node wasm/verify.mjs` covers the
@@ -289,7 +289,7 @@ Integration tests generate PDFs in `tests/output/` for visual verification:
 Rendering the same input twice must produce the same bytes: Baker Bridge commits
 its packaged PDFs, and non-determinism rewrites 184 files on every rebuild for no
 content change. `rendering_is_byte_reproducible_across_runs` guards this for all
-six layouts.
+seven layouts.
 
 Anything that reaches the PDF in iteration order has to be ordered deliberately.
 `CardAssets::load_faces` sorts before registering XObjects because a `HashSet`'s

@@ -69,6 +69,7 @@ export const layoutLabel = (id) =>
     'declarers-plan-2up': "Declarer's plan — 2 per page",
     'declarers-plan': "Declarer's plan — 4 per page",
     'dealer-summary': 'Dealer summary',
+    'hand-record': 'Hand record',
   })[id] ?? id
 
 export const usesCardArt = (id) => id.startsWith('declarers-plan')
@@ -81,6 +82,7 @@ export const LAYOUT_ORDER = [
   'bidding-sheets',
   'dealer-summary',
   'analysis',
+  'hand-record',
 ]
 
 export const orderLayouts = (ids) =>
