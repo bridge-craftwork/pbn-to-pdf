@@ -13,8 +13,8 @@ use bridge_encodings::pbn::read_pbn;
 
 use crate::error::PbnError;
 use crate::model::{
-    AnnotatedCall, Auction, BCFlags, Board, Deal, FinalContract, Hand, HiddenHands, Holding,
-    PbnMetadata,
+    AnnotatedCall, Auction, BCFlags, Board, CommentarySlot, Deal, FinalContract, Hand, HiddenHands,
+    Holding, PbnMetadata,
 };
 
 use super::commentary::parse_commentary;
@@ -48,6 +48,27 @@ pub fn parse_pbn(content: &str) -> Result<PbnFile, PbnError> {
     Ok(PbnFile { metadata, boards })
 }
 
+/// Which part of its board a commentary block belongs to, from how many of the
+/// record's tags came before it (see [`CommentarySlot`]).
+fn commentary_slot(anchor: Option<usize>, tag_order: &[String]) -> CommentarySlot {
+    let Some(before) = anchor else {
+        return CommentarySlot::default();
+    };
+    let at = |name: &str| tag_order.iter().position(|t| t == name);
+    let deal = at("Deal");
+    // A block that `before` tags preceded stands ahead of the tag at index
+    // `before`, so it precedes the tag at `i` exactly when `before <= i`.
+    if at("Board").or(deal).is_some_and(|i| before <= i) {
+        CommentarySlot::Event
+    } else if deal.is_some_and(|i| before <= i) {
+        CommentarySlot::BeforeDeal
+    } else if deal.is_some_and(|i| before == i + 1) {
+        CommentarySlot::Diagram
+    } else {
+        CommentarySlot::Final
+    }
+}
+
 /// Build the render model's board from the one the reader produced.
 fn adapt_board(src: bridge_types::Board) -> Board {
     let mut board = Board {
@@ -68,7 +89,13 @@ fn adapt_board(src: bridge_types::Board) -> Board {
         commentary: src
             .commentary
             .iter()
-            .filter_map(|text| parse_commentary(text).ok())
+            .enumerate()
+            .filter_map(|(i, text)| {
+                let mut block = parse_commentary(text).ok()?;
+                block.slot =
+                    commentary_slot(src.commentary_anchors.get(i).copied(), &src.tag_order);
+                Some(block)
+            })
             .collect(),
         bc_flags: None,
         hidden: HiddenHands::default(),
@@ -249,5 +276,29 @@ fn display_one(part: &str) -> Option<String> {
         "$3" => Some("!!".to_string()),
         "$4" => Some("??".to_string()),
         _ => None,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_block_belongs_to_the_slot_it_stood_in() {
+        // Kantar's record shape, with a block in each place one can stand
+        let tags: Vec<String> = ["Event", "Board", "SkillPath", "Deal", "Result"]
+            .map(String::from)
+            .to_vec();
+        let slot = |before| commentary_slot(Some(before), &tags);
+        assert_eq!(slot(0), CommentarySlot::Event, "before every tag");
+        assert_eq!(slot(1), CommentarySlot::Event, "after [Event]");
+        assert_eq!(slot(3), CommentarySlot::BeforeDeal, "after [SkillPath]");
+        assert_eq!(slot(4), CommentarySlot::Diagram, "straight after [Deal]");
+        assert_eq!(slot(5), CommentarySlot::Final, "after [Result]");
+        assert_eq!(
+            commentary_slot(None, &tags),
+            CommentarySlot::Final,
+            "position unknown"
+        );
     }
 }
