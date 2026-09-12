@@ -8,7 +8,7 @@ A Rust CLI tool that converts PBN (Portable Bridge Notation) files to PDF with B
 - Unicode suit symbols (♠♥♦♣) with red/black coloring
 - Bidding table with West/North/East/South columns
 - Commentary text with formatting (bold, italic, inline suit symbols)
-- HCP (High Card Points) display for each hand
+- HCP (High Card Points) display for each hand, drawn when the file asks for it with `%BCOptions ShowHCP`
 - Configurable page layout (1, 2, or 4 boards per page)
 - Support for Letter, A4, and Legal paper sizes
 
@@ -45,7 +45,8 @@ pbn-to-pdf [OPTIONS] <INPUT>
 | `--no-bidding` | Hide bidding table |
 | `--no-play` | Hide play sequence |
 | `--no-commentary` | Hide commentary text |
-| `--no-hcp` | Hide HCP point counts |
+| `--hcp` | Show HCP point counts even when the PBN does not ask for them |
+| `--no-hcp` | Hide HCP point counts, even when the PBN asks for them |
 | `-b, --boards <RANGE>` | Board range to include (e.g., "1-16" or "5,8,12") |
 | `-t, --title [TITLE]` | Title for bidding sheets banner (overrides %HRTitleEvent; use with no value to hide) |
 | `--debug-boxes` | Draw debug boxes around layout regions |
