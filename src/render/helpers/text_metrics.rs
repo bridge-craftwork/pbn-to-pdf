@@ -93,9 +93,13 @@ impl BuiltinFontMeasurer {
             return 896;
         }
 
-        // ASCII printable range only - builtin fonts are Win-1252
+        // Beyond ASCII, measure what the font will actually draw
         if !c.is_ascii() {
-            return 500; // Default width for non-ASCII
+            return match winansi_char(c) {
+                Some(drawn) if drawn.is_ascii() => self.char_width(drawn),
+                Some(drawn) => self.upper_width(drawn),
+                None => 0,
+            };
         }
 
         let code = c as u8;
@@ -131,6 +135,29 @@ impl BuiltinFontMeasurer {
             | BuiltinFont::CourierBoldOblique => 600, // Monospace
             BuiltinFont::Symbol | BuiltinFont::ZapfDingbats => 500,
         }
+    }
+
+    /// Width of a Windows-1252 character above ASCII, in 1000 units per em
+    fn upper_width(&self, c: char) -> u16 {
+        let Some(index) = CP1252_UPPER.iter().position(|&u| u == c) else {
+            return 500;
+        };
+        let widths = match self.font {
+            BuiltinFont::TimesRoman => &TIMES_ROMAN_UPPER_WIDTHS,
+            BuiltinFont::TimesBold => &TIMES_BOLD_UPPER_WIDTHS,
+            BuiltinFont::TimesItalic => &TIMES_ITALIC_UPPER_WIDTHS,
+            BuiltinFont::TimesBoldItalic => &TIMES_BOLD_ITALIC_UPPER_WIDTHS,
+            BuiltinFont::Helvetica | BuiltinFont::HelveticaOblique => &HELVETICA_UPPER_WIDTHS,
+            BuiltinFont::HelveticaBold | BuiltinFont::HelveticaBoldOblique => {
+                &HELVETICA_BOLD_UPPER_WIDTHS
+            }
+            BuiltinFont::Courier
+            | BuiltinFont::CourierBold
+            | BuiltinFont::CourierOblique
+            | BuiltinFont::CourierBoldOblique => return 600,
+            BuiltinFont::Symbol | BuiltinFont::ZapfDingbats => return 500,
+        };
+        widths[index]
     }
 
     /// Measure text width in points
@@ -374,6 +401,139 @@ static HELVETICA_BOLD_WIDTHS: [u16; 128] = [
     611, 611, 389, 556, 333, 611, 556, 778, 556, 556, 500, 389, 280, 389, 584, 0,
 ];
 
+// ============================================================================
+// Windows-1252 upper half
+// ============================================================================
+//
+// The builtin fonts are drawn through WinAnsiEncoding, which is Windows-1252:
+// every character below can be printed as itself. The widths come from the
+// Adobe AFM files for the standard 14 fonts.
+
+/// The character a builtin font draws for `c`, or `None` when it draws nothing.
+///
+/// Anything Windows-1252 can encode is drawn as itself -- curly quotes, dashes,
+/// bullets, the ellipsis, accented letters. The few common characters outside it
+/// fall back to their nearest ASCII look-alike, suit symbols are dropped (they
+/// are drawn in the symbol font instead), and anything else becomes `?`.
+pub(crate) fn winansi_char(c: char) -> Option<char> {
+    if c.is_ascii() || CP1252_UPPER.contains(&c) {
+        return Some(c);
+    }
+    match c {
+        '\u{2015}' | '\u{2027}' | '\u{2212}' => Some('-'), // horizontal bar, hyphenation point, minus
+        '\u{2023}' => Some('>'),                           // triangular bullet
+        '\u{25CF}' => Some('\u{2022}'),                    // black circle, used as a bullet
+        '\u{27E6}' => Some('['),                           // white square brackets, which
+        '\u{27E7}' => Some(']'),                           // Practice-Bidding-Scenarios writes
+        // en, em, thin, hair and narrow no-break spaces
+        '\u{2002}' | '\u{2003}' | '\u{2009}' | '\u{200A}' | '\u{202F}' => Some(' '),
+        // zero-width joiners draw nothing, and neither do suit symbols here
+        '\u{200C}' | '\u{200D}' => None,
+        '\u{2660}' | '\u{2663}' | '\u{2665}' | '\u{2666}' => None,
+        _ => Some('?'),
+    }
+}
+
+/// The Windows-1252 byte that encodes `c`, if it has one.
+///
+/// printpdf passes builtin-font text to lopdf as UTF-8 bytes, so anything past
+/// ASCII has to be encoded here instead -- see `LayerBuilder::use_text_builtin`.
+pub(crate) fn winansi_byte(c: char) -> Option<u8> {
+    if c.is_ascii() {
+        return Some(c as u8);
+    }
+    CP1252_UPPER
+        .iter()
+        .position(|&u| u == c)
+        .map(|i| 0x80 + i as u8)
+}
+
+/// Windows-1252 bytes 0x80-0xFF as Unicode; `'\0'` marks the five unassigned codes.
+const CP1252_UPPER: [char; 128] = [
+    '\u{20AC}', '\0', '\u{201A}', '\u{0192}', '\u{201E}', '\u{2026}', '\u{2020}', '\u{2021}',
+    '\u{02C6}', '\u{2030}', '\u{0160}', '\u{2039}', '\u{0152}', '\0', '\u{017D}', '\0', '\0',
+    '\u{2018}', '\u{2019}', '\u{201C}', '\u{201D}', '\u{2022}', '\u{2013}', '\u{2014}', '\u{02DC}',
+    '\u{2122}', '\u{0161}', '\u{203A}', '\u{0153}', '\0', '\u{017E}', '\u{0178}', '\u{00A0}',
+    '\u{00A1}', '\u{00A2}', '\u{00A3}', '\u{00A4}', '\u{00A5}', '\u{00A6}', '\u{00A7}', '\u{00A8}',
+    '\u{00A9}', '\u{00AA}', '\u{00AB}', '\u{00AC}', '\u{00AD}', '\u{00AE}', '\u{00AF}', '\u{00B0}',
+    '\u{00B1}', '\u{00B2}', '\u{00B3}', '\u{00B4}', '\u{00B5}', '\u{00B6}', '\u{00B7}', '\u{00B8}',
+    '\u{00B9}', '\u{00BA}', '\u{00BB}', '\u{00BC}', '\u{00BD}', '\u{00BE}', '\u{00BF}', '\u{00C0}',
+    '\u{00C1}', '\u{00C2}', '\u{00C3}', '\u{00C4}', '\u{00C5}', '\u{00C6}', '\u{00C7}', '\u{00C8}',
+    '\u{00C9}', '\u{00CA}', '\u{00CB}', '\u{00CC}', '\u{00CD}', '\u{00CE}', '\u{00CF}', '\u{00D0}',
+    '\u{00D1}', '\u{00D2}', '\u{00D3}', '\u{00D4}', '\u{00D5}', '\u{00D6}', '\u{00D7}', '\u{00D8}',
+    '\u{00D9}', '\u{00DA}', '\u{00DB}', '\u{00DC}', '\u{00DD}', '\u{00DE}', '\u{00DF}', '\u{00E0}',
+    '\u{00E1}', '\u{00E2}', '\u{00E3}', '\u{00E4}', '\u{00E5}', '\u{00E6}', '\u{00E7}', '\u{00E8}',
+    '\u{00E9}', '\u{00EA}', '\u{00EB}', '\u{00EC}', '\u{00ED}', '\u{00EE}', '\u{00EF}', '\u{00F0}',
+    '\u{00F1}', '\u{00F2}', '\u{00F3}', '\u{00F4}', '\u{00F5}', '\u{00F6}', '\u{00F7}', '\u{00F8}',
+    '\u{00F9}', '\u{00FA}', '\u{00FB}', '\u{00FC}', '\u{00FD}', '\u{00FE}', '\u{00FF}',
+];
+
+/// Times-Roman widths for [`CP1252_UPPER`], from its AFM.
+const TIMES_ROMAN_UPPER_WIDTHS: [u16; 128] = [
+    500, 0, 333, 500, 444, 1000, 500, 500, 333, 1000, 556, 333, 889, 0, 611, 0, 0, 333, 333, 444,
+    444, 350, 500, 1000, 333, 980, 389, 333, 722, 0, 444, 722, 250, 333, 500, 500, 500, 500, 200,
+    500, 333, 760, 276, 500, 564, 333, 760, 333, 400, 564, 300, 300, 333, 500, 453, 250, 333, 300,
+    310, 500, 750, 750, 750, 444, 722, 722, 722, 722, 722, 722, 889, 667, 611, 611, 611, 611, 333,
+    333, 333, 333, 722, 722, 722, 722, 722, 722, 722, 564, 722, 722, 722, 722, 722, 722, 556, 500,
+    444, 444, 444, 444, 444, 444, 667, 444, 444, 444, 444, 444, 278, 278, 278, 278, 500, 500, 500,
+    500, 500, 500, 500, 564, 500, 500, 500, 500, 500, 500, 500, 500,
+];
+
+/// Times-Bold widths for [`CP1252_UPPER`], from its AFM.
+const TIMES_BOLD_UPPER_WIDTHS: [u16; 128] = [
+    500, 0, 333, 500, 500, 1000, 500, 500, 333, 1000, 556, 333, 1000, 0, 667, 0, 0, 333, 333, 500,
+    500, 350, 500, 1000, 333, 1000, 389, 333, 722, 0, 444, 722, 250, 333, 500, 500, 500, 500, 220,
+    500, 333, 747, 300, 500, 570, 333, 747, 333, 400, 570, 300, 300, 333, 556, 540, 250, 333, 300,
+    330, 500, 750, 750, 750, 500, 722, 722, 722, 722, 722, 722, 1000, 722, 667, 667, 667, 667, 389,
+    389, 389, 389, 722, 722, 778, 778, 778, 778, 778, 570, 778, 722, 722, 722, 722, 722, 611, 556,
+    500, 500, 500, 500, 500, 500, 722, 444, 444, 444, 444, 444, 278, 278, 278, 278, 500, 556, 500,
+    500, 500, 500, 500, 570, 500, 556, 556, 556, 556, 500, 556, 500,
+];
+
+/// Times-Italic widths for [`CP1252_UPPER`], from its AFM.
+const TIMES_ITALIC_UPPER_WIDTHS: [u16; 128] = [
+    500, 0, 333, 500, 556, 889, 500, 500, 333, 1000, 500, 333, 944, 0, 556, 0, 0, 333, 333, 556,
+    556, 350, 500, 889, 333, 980, 389, 333, 667, 0, 389, 556, 250, 389, 500, 500, 500, 500, 275,
+    500, 333, 760, 276, 500, 675, 333, 760, 333, 400, 675, 300, 300, 333, 500, 523, 250, 333, 300,
+    310, 500, 750, 750, 750, 500, 611, 611, 611, 611, 611, 611, 889, 667, 611, 611, 611, 611, 333,
+    333, 333, 333, 722, 667, 722, 722, 722, 722, 722, 675, 722, 722, 722, 722, 722, 556, 611, 500,
+    500, 500, 500, 500, 500, 500, 667, 444, 444, 444, 444, 444, 278, 278, 278, 278, 500, 500, 500,
+    500, 500, 500, 500, 675, 500, 500, 500, 500, 500, 444, 500, 444,
+];
+
+/// Times-BoldItalic widths for [`CP1252_UPPER`], from its AFM.
+const TIMES_BOLD_ITALIC_UPPER_WIDTHS: [u16; 128] = [
+    500, 0, 333, 500, 500, 1000, 500, 500, 333, 1000, 556, 333, 944, 0, 611, 0, 0, 333, 333, 500,
+    500, 350, 500, 1000, 333, 1000, 389, 333, 722, 0, 389, 611, 250, 389, 500, 500, 500, 500, 220,
+    500, 333, 747, 266, 500, 606, 333, 747, 333, 400, 570, 300, 300, 333, 576, 500, 250, 333, 300,
+    300, 500, 750, 750, 750, 500, 667, 667, 667, 667, 667, 667, 944, 667, 667, 667, 667, 667, 389,
+    389, 389, 389, 722, 722, 722, 722, 722, 722, 722, 570, 722, 722, 722, 722, 722, 611, 611, 500,
+    500, 500, 500, 500, 500, 500, 722, 444, 444, 444, 444, 444, 278, 278, 278, 278, 500, 556, 500,
+    500, 500, 500, 500, 570, 500, 556, 556, 556, 556, 444, 500, 444,
+];
+
+/// Helvetica widths for [`CP1252_UPPER`], from its AFM.
+const HELVETICA_UPPER_WIDTHS: [u16; 128] = [
+    556, 0, 222, 556, 333, 1000, 556, 556, 333, 1000, 667, 333, 1000, 0, 611, 0, 0, 222, 222, 333,
+    333, 350, 556, 1000, 333, 1000, 500, 333, 944, 0, 500, 667, 278, 333, 556, 556, 556, 556, 260,
+    556, 333, 737, 370, 556, 584, 333, 737, 333, 400, 584, 333, 333, 333, 556, 537, 278, 333, 333,
+    365, 556, 834, 834, 834, 611, 667, 667, 667, 667, 667, 667, 1000, 722, 667, 667, 667, 667, 278,
+    278, 278, 278, 722, 722, 778, 778, 778, 778, 778, 584, 778, 722, 722, 722, 722, 667, 667, 611,
+    556, 556, 556, 556, 556, 556, 889, 500, 556, 556, 556, 556, 278, 278, 278, 278, 556, 556, 556,
+    556, 556, 556, 556, 584, 611, 556, 556, 556, 556, 500, 556, 500,
+];
+
+/// Helvetica-Bold widths for [`CP1252_UPPER`], from its AFM.
+const HELVETICA_BOLD_UPPER_WIDTHS: [u16; 128] = [
+    556, 0, 278, 556, 500, 1000, 556, 556, 333, 1000, 667, 333, 1000, 0, 611, 0, 0, 278, 278, 500,
+    500, 350, 556, 1000, 333, 1000, 556, 333, 944, 0, 500, 667, 278, 333, 556, 556, 556, 556, 280,
+    556, 333, 737, 370, 556, 584, 333, 737, 333, 400, 584, 333, 333, 333, 611, 556, 278, 333, 333,
+    365, 556, 834, 834, 834, 611, 722, 722, 722, 722, 722, 722, 1000, 722, 667, 667, 667, 667, 278,
+    278, 278, 278, 722, 722, 778, 778, 778, 778, 778, 584, 778, 722, 722, 722, 722, 667, 667, 611,
+    556, 556, 556, 556, 556, 556, 889, 556, 556, 556, 556, 556, 278, 278, 278, 278, 611, 611, 611,
+    611, 611, 611, 611, 584, 611, 611, 611, 611, 611, 556, 611, 556,
+];
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -427,5 +587,38 @@ mod tests {
         // But both should be reasonable
         assert!(times_width > 0.0 && times_width < 50.0);
         assert!(helvetica_width > 0.0 && helvetica_width < 50.0);
+    }
+
+    fn width_in_units(measurer: &BuiltinFontMeasurer, text: &str) -> f32 {
+        measurer.measure_width_pt(text, 1000.0)
+    }
+
+    #[test]
+    fn windows_1252_characters_measure_at_their_afm_width() {
+        let times = get_times_measurer();
+        // Times-Roman.afm: bullet 350, endash 500, quotedblleft 444, eacute 444
+        for (text, width) in [
+            ("\u{2022}", 350.0),
+            ("\u{2013}", 500.0),
+            ("\u{201C}", 444.0),
+            ("\u{00E9}", 444.0),
+        ] {
+            assert!(
+                (width_in_units(times, text) - width).abs() < 0.01,
+                "{text:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn characters_outside_windows_1252_measure_as_what_is_drawn() {
+        assert_eq!(winansi_char('\u{202F}'), Some(' '));
+        assert_eq!(winansi_char('\u{2212}'), Some('-'));
+        assert_eq!(winansi_char('\u{4E2D}'), Some('?'));
+        let times = get_times_measurer();
+        assert_eq!(
+            width_in_units(times, "\u{202F}"),
+            width_in_units(times, " ")
+        );
     }
 }

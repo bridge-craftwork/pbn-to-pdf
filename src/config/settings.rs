@@ -36,6 +36,10 @@ pub struct Settings {
     pub show_play: bool,
     pub show_commentary: bool,
     pub show_hcp: bool,
+    /// `%ShowCardTable`: draw the green card table between the hands
+    pub show_card_table: bool,
+    /// `%ShowBoardLabels`: print the board number, dealer and vulnerability
+    pub show_board_labels: bool,
     pub justify: bool,
     pub debug_boxes: bool,
     /// Circle sure winners on declarer's plan layouts
@@ -106,6 +110,8 @@ impl Default for Settings {
             show_play: true,
             show_commentary: true,
             show_hcp: false,
+            show_card_table: true,
+            show_board_labels: true,
             justify: false,
             debug_boxes: false,
             circle_sure_winners: false,
@@ -176,6 +182,8 @@ impl Settings {
             show_play: args.show_play(),
             show_commentary: args.show_commentary(),
             show_hcp: args.show_hcp(),
+            show_card_table: true,
+            show_board_labels: true,
             debug_boxes: args.debug_boxes,
             circle_sure_winners: args.circle_sure_winners,
             circle_promotable_winners: args.circle_promotable_winners,
@@ -252,6 +260,12 @@ impl Settings {
         // Apply display options from PBN metadata
         if metadata.layout.show_hcp {
             self.show_hcp = true;
+        }
+        if let Some(show) = metadata.layout.show_card_table {
+            self.show_card_table = show;
+        }
+        if let Some(show) = metadata.layout.show_board_labels {
+            self.show_board_labels = show;
         }
         if metadata.layout.justify {
             self.justify = true;
