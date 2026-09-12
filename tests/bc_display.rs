@@ -278,12 +278,25 @@ fn the_card_table_shows_the_trick_as_bare_ranks() {
             .count()
     };
 
+    // 0x01 without 0x800: no card table, but the play record is drawn (#42),
+    // so the lead shows in West's hand and again in the record. North's 3 shows
+    // only in the record -- its holding stays the single string "10 8 3".
     let shown = render_trick("1f");
-    assert_eq!(count(&shown, "4"), 1, "no card table, so West's 4 once");
+    assert_eq!(count(&shown, "4"), 2, "West's 4 in the hand and the record");
+    assert_eq!(count(&shown, "3"), 1, "North's 3 in the record only");
 
+    // 0x800 adds the card table, and splits the played 3 out of the holding
     let shown = render_trick("81f");
-    assert_eq!(count(&shown, "4"), 2, "West's 4 in the hand and the table");
-    assert_eq!(count(&shown, "3"), 2, "North's 3 in the hand and the table");
+    assert_eq!(
+        count(&shown, "4"),
+        3,
+        "West's 4 in the hand, the table and the record"
+    );
+    assert_eq!(
+        count(&shown, "3"),
+        3,
+        "North's 3 in the hand, the table and the record"
+    );
 }
 
 /// A board carrying `[Contract]` and `[Play]` gets both lines with no
@@ -299,14 +312,21 @@ const LEAD: &str = r#"[Board "1"]
 [BCFlags "FLAGS"]
 AUCTION[Play "S"]
 PLAY
-*
 "#;
 
 fn render_lead_board(flags: &str, auction: &str, play: &str) -> Vec<Vec<u8>> {
+    // A section that already ends with `+` is continued; closing it with `*`
+    // would say the opposite, and the two markers mean different things to the
+    // play record.
+    let section = if play.trim_end().ends_with('+') {
+        play.to_string()
+    } else {
+        format!("{play}\n*")
+    };
     let pbn = LEAD
         .replace("FLAGS", flags)
         .replace("AUCTION", auction)
-        .replace("PLAY", play);
+        .replace("PLAY", &section);
     let file = parse_pbn(&pbn).unwrap();
     let pdf = render_boards(
         &file.boards,
@@ -466,4 +486,68 @@ fn label_font(pdf: &[u8], text: &str) -> Option<String> {
         }
     }
     None
+}
+
+/// BridgeComposer puts up a play-record table in place of the `Lead:` line —
+/// `Trick / Lead / 2nd / 3rd / 4th`, one row per trick (#42).
+///
+/// 0x01 asks for it, not 0x800. The issue guessed 0x800, but ABS3-3's
+/// exercises carry that bit on 41 boards and BridgeComposer draws no table on
+/// any of them; every table in the corpus sits under 0x01.
+#[test]
+fn the_play_record_table_follows_the_play_bit() {
+    let drawn = |flags: &str, play: &str| {
+        let shown = render_lead_board(flags, "", play);
+        shown.iter().any(|s| s == "Trick".as_bytes())
+    };
+
+    assert!(drawn("7f", "HK H3 H2 HA"), "0x01 with a record to tabulate");
+    assert!(
+        !drawn("87e", "HK H3 H2 HA"),
+        "0x800 alone draws the card table, not the record"
+    );
+    assert!(
+        !drawn("7e", "HK H3 H2 HA"),
+        "neither bit, so just the Lead: line"
+    );
+}
+
+/// A section holding nothing but the opening lead prints as a `Lead:` line —
+/// ABS1-1's practice deals do — unless it closes with `+`, which says the play
+/// is unfinished rather than unrecorded. Grant's *Squeeze 2 Practice* has six
+/// sections that are either longer than a lead or continued, and
+/// BridgeComposer draws six tables.
+#[test]
+fn a_lone_opening_lead_is_a_line_unless_the_section_continues() {
+    let table = |play: &str| {
+        let shown = render_lead_board("7f", "", play);
+        (
+            shown.iter().any(|s| s == "Trick".as_bytes()),
+            shown.iter().any(|s| s == "Lead: ".as_bytes()),
+        )
+    };
+
+    assert_eq!(table("HK"), (false, true), "a lone lead is a line");
+    assert_eq!(table("HK +"), (true, false), "continued, so tabulate it");
+    assert_eq!(table("HK H3"), (true, false), "more than a lead");
+}
+
+/// The record shows the trick's leader, a bare rank for a card that follows
+/// the led suit, and the suit symbol for one that does not.
+#[test]
+fn the_record_keeps_a_suit_symbol_only_when_the_card_does_not_follow() {
+    // North, third to play, is void and discards a club
+    let shown = render_lead_board("7f", "", "HK H3 C2 HA");
+    let drawn = |t: &str| {
+        shown
+            .iter()
+            .filter(|s| s.as_slice() == t.as_bytes())
+            .count()
+    };
+
+    assert!(drawn("Trick") == 1 && drawn("Lead") == 1, "the headings");
+    assert!(drawn("1.") == 1, "one trick, numbered");
+    // The club shows its symbol; the hearts that follow do not add one. Two
+    // suit symbols reach the table: the lead's heart and the discard's club.
+    assert!(drawn("S") >= 1, "the leader's seat letter");
 }

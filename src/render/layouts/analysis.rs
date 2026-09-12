@@ -3,6 +3,7 @@ use crate::error::RenderError;
 use crate::model::card::RankExt;
 use crate::model::{
     AuctionExt, BCFlags, BidSuit, Board, Card, CommentaryBlock, CommentarySlot, PlaySequence,
+    SectionEnd,
 };
 use printpdf::{BuiltinFont, Color, FontId, Mm, PaintMode, PdfPage, Rgb};
 
@@ -10,6 +11,7 @@ use crate::render::components::bidding_table::BiddingTableRenderer;
 use crate::render::components::commentary::{CommentaryRenderer, FloatLayout};
 use crate::render::components::hand_diagram::{DiagramDisplayOptions, HandDiagramRenderer};
 use crate::render::components::page_furniture::PageFurniture;
+use crate::render::components::play_record::PlayRecordRenderer;
 use crate::render::helpers::colors::{SuitColors, BLACK};
 use crate::render::helpers::compress::compress_pdf;
 use crate::render::helpers::document::new_document;
@@ -225,15 +227,35 @@ impl<'a> ColumnCommentary<'a> {
 /// So the bit alone does not decide it: a lone opening lead still prints as
 /// one. The table itself is #42.
 fn opening_lead(board: &Board) -> Option<Card> {
-    let flags = board.bc_flags;
-    if flags.is_some_and(|f| f.show_trick()) {
+    if board.bc_flags.is_some_and(|f| f.show_trick()) {
         return None;
     }
+    // The play-record table stands in the line's place, so asking for it here
+    // keeps the two from ever both being drawn
+    if play_record(board).is_some() {
+        return None;
+    }
+    board.play.as_ref()?.tricks.first()?.cards[0]
+}
+
+/// The play section to tabulate, when BridgeComposer puts up its play-record
+/// table in place of a `Lead:` line (issue #42).
+///
+/// `BCFlags` 0x01 asks for the table -- not 0x800, which the issue guessed at:
+/// ABS3-3's exercises carry 0x800 on 41 boards and BridgeComposer draws no
+/// table on any of them. 0x800 does not suppress it either; a board with both
+/// gets the card table *and* the record.
+///
+/// There also has to be something worth tabulating. A section holding nothing
+/// but the opening lead prints as a `Lead:` line -- ABS1-1's practice deals do
+/// -- unless it closes with `+`, which says the play is unfinished rather than
+/// unrecorded. Grant's *Squeeze 2 Practice* has six sections that are either
+/// longer than a lead or continued, and BridgeComposer draws six tables.
+fn play_record(board: &Board) -> Option<&PlaySequence> {
     let play = board.play.as_ref()?;
-    if flags.is_some_and(|f| f.show_play()) && played_card_count(play) > 1 {
-        return None;
-    }
-    play.tricks.first()?.cards[0]
+    let asked = board.bc_flags.is_some_and(|f| f.show_play());
+    let worth_it = played_card_count(play) > 1 || play.end == SectionEnd::Continued;
+    (asked && worth_it).then_some(play)
 }
 
 /// How many cards a `[Play]` section actually records, placeholders aside.
@@ -389,6 +411,7 @@ impl DocumentRenderer {
         // Auction height
         let has_contract = board.contract.is_some();
         let has_lead = opening_lead(board).is_some();
+        let record = play_record(board);
         let has_more_below = if self.settings.center {
             !commentary.below.is_empty()
         } else {
@@ -428,15 +451,15 @@ impl DocumentRenderer {
                 }
                 height += auction_height;
 
-                // Spacing after auction (only if there's contract or lead)
-                if has_contract || has_lead {
+                // Spacing after auction (only if there's contract, lead or record)
+                if has_contract || has_lead || record.is_some() {
                     height += line_height;
                 }
 
-                // With no contract or lead to step past, the commentary under
-                // the auction needs a line's gap of its own, or its first line
-                // prints on the last call
-                if !has_contract && !has_lead && !commentary.below.is_empty() {
+                // With nothing to step past, the commentary under the auction
+                // needs a line's gap of its own, or its first line prints on
+                // the last call
+                if !has_contract && !has_lead && record.is_none() && !commentary.below.is_empty() {
                     height += line_height;
                 }
             }
@@ -445,14 +468,14 @@ impl DocumentRenderer {
         // The contract and lead do not need an auction to be drawn (issue #48),
         // so they are measured outside it, the way render_board_in_column draws
         // them.
-        if !measured_auction && (has_contract || has_lead) {
+        if !measured_auction && (has_contract || has_lead || record.is_some()) {
             height += line_height;
         }
 
         // Contract line
         if has_contract {
             // Only add spacing if there's more content below
-            if has_lead || has_more_below {
+            if has_lead || record.is_some() || has_more_below {
                 height += line_height;
             }
         }
@@ -460,6 +483,14 @@ impl DocumentRenderer {
         // Opening lead line
         if has_lead {
             // Only add spacing if there's more content below
+            if has_more_below {
+                height += line_height;
+            }
+        }
+
+        // The play-record table stands where the lead line would (issue #42)
+        if let Some(play) = record {
+            height += PlayRecordRenderer::height(&self.settings, play);
             if has_more_below {
                 height += line_height;
             }
@@ -1279,7 +1310,8 @@ impl DocumentRenderer {
         // (issue #48), so they sit outside the auction branch. A column keeps
         // them at its left edge either way, which is where BridgeComposer puts
         // them.
-        if !drew_auction && (has_contract || has_lead) {
+        let record = play_record(board);
+        if !drew_auction && (has_contract || has_lead || record.is_some()) {
             current_y -= line_height;
         }
 
@@ -1296,7 +1328,7 @@ impl DocumentRenderer {
                 &colors,
             );
             // Only add spacing if there's more content below
-            if has_lead || has_more_below {
+            if has_lead || record.is_some() || has_more_below {
                 current_y -= line_height;
             }
         }
@@ -1314,6 +1346,19 @@ impl DocumentRenderer {
                 &colors,
             );
             // Only add spacing if there's more content below
+            if has_more_below {
+                current_y -= line_height;
+            }
+        }
+
+        // The play-record table stands where the Lead: line would (issue #42)
+        if let Some(play) = record {
+            let recorder = PlayRecordRenderer::new(
+                hand_record_fonts.regular,
+                fonts.symbol_font(),
+                &self.settings,
+            );
+            current_y -= recorder.render(layer, play, column_x, current_y);
             if has_more_below {
                 current_y -= line_height;
             }
@@ -1646,7 +1691,8 @@ impl DocumentRenderer {
         let has_contract = board.contract.is_some();
         let has_lead = opening_lead(board).is_some();
 
-        if has_contract || has_lead {
+        let record = play_record(board);
+        if has_contract || has_lead || record.is_some() {
             // Add spacing after the auction, or the diagram, before contract/lead
             content_y = Mm(content_y.0 - line_height);
 
@@ -1671,7 +1717,7 @@ impl DocumentRenderer {
                     contract_width,
                     cap_height + descender,
                 );
-                if has_lead {
+                if has_lead || record.is_some() {
                     content_y = Mm(content_y.0 - line_height);
                 }
             }
@@ -1697,9 +1743,19 @@ impl DocumentRenderer {
                     cap_height + descender,
                 );
             }
+
+            // The play-record table stands where the Lead: line would (#42)
+            if let Some(play) = record {
+                let recorder = PlayRecordRenderer::new(
+                    hand_record_fonts.regular,
+                    fonts.symbol_font(),
+                    &self.settings,
+                );
+                content_y = Mm(content_y.0 - recorder.render(layer, play, contract_x, content_y.0));
+            }
         }
 
-        if drew_auction || has_contract || has_lead {
+        if drew_auction || has_contract || has_lead || record.is_some() {
             content_y = Mm(content_y.0 - 3.0);
         }
 

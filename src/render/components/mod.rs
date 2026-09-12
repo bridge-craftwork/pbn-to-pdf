@@ -8,6 +8,7 @@ pub mod fan;
 pub mod hand_diagram;
 pub mod losers_table;
 pub mod page_furniture;
+pub mod play_record;
 pub mod winners_table;
 
 pub use bidding_table::BiddingTableRenderer;
