@@ -3,8 +3,10 @@ name: CI
 on:
   push:
     branches: [main]
+  # Every pull request, not only those targeting main: a stacked branch that
+  # points at its parent needs testing too, and until it got some, a PR could
+  # be merged having never run CI at all.
   pull_request:
-    branches: [main]
 
 env:
   CARGO_TERM_COLOR: always
