@@ -5,7 +5,7 @@
 //!
 //! Based on Bridge Composer's DealerSummary.wsf script.
 
-use printpdf::{Color, Mm, PdfDocument, PdfPage, PdfSaveOptions, Rgb};
+use printpdf::{Color, Mm, PdfPage, Rgb};
 
 use crate::config::Settings;
 use crate::error::RenderError;
@@ -14,8 +14,9 @@ use crate::model::Board;
 
 use crate::render::helpers::colors::{SuitColors, BLACK};
 use crate::render::helpers::compress::compress_pdf;
+use crate::render::helpers::document::new_document;
 use crate::render::helpers::fonts::FontManager;
-use crate::render::helpers::layer::LayerBuilder;
+use crate::render::helpers::layer::{save_options, LayerBuilder};
 use crate::render::helpers::text_metrics::get_helvetica_measurer;
 
 /// Border color for cells
@@ -70,7 +71,7 @@ impl DealerSummaryRenderer {
             .map(|s| s.as_str())
             .unwrap_or("Dealer Summary");
 
-        let mut doc = PdfDocument::new(title);
+        let mut doc = new_document(title);
 
         // Load fonts
         let fonts = FontManager::new(&mut doc)?;
@@ -91,7 +92,7 @@ impl DealerSummaryRenderer {
         doc.with_pages(pages);
 
         let mut warnings = Vec::new();
-        let bytes = doc.save(&PdfSaveOptions::default(), &mut warnings);
+        let bytes = doc.save(&save_options(), &mut warnings);
 
         // Compress PDF streams to reduce file size
         let compressed = compress_pdf(bytes.clone()).unwrap_or(bytes);

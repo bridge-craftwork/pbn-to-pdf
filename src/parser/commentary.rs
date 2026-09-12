@@ -39,6 +39,17 @@ pub fn replace_suit_escapes(input: &str) -> String {
             } else {
                 result.push(c);
             }
+        } else if c == '!' && matches!(chars.peek(), Some('S' | 'H' | 'D' | 'C')) {
+            // BBO's form. Unlike the backslash form it is uppercase only, and
+            // in the corpus it is always a suit -- `3!SX`, `!DK` and `K!H`
+            // included -- so it converts without a word-boundary test, which
+            // would miss exactly those.
+            result.push(match chars.next() {
+                Some('S') => '♠',
+                Some('H') => '♥',
+                Some('D') => '♦',
+                _ => '♣',
+            });
         } else {
             result.push(c);
         }
@@ -236,6 +247,13 @@ pub fn parse_formatted_text(input: &str) -> Result<FormattedText, String> {
     // Pre-process: strip empty or whitespace-only italic tags like <i> </i>
     // These are sometimes used in PBN files for formatting around punctuation
     let input = strip_empty_italic_tags(input);
+    // BBO's `!S` is the backslash form in other clothes; rewriting it here lets
+    // every span type, and card references like `!SK`, handle it the same way
+    let input = input
+        .replace("!S", "\\S")
+        .replace("!H", "\\H")
+        .replace("!D", "\\D")
+        .replace("!C", "\\C");
 
     let mut text = FormattedText::new();
     let mut remaining = input.as_str();
@@ -700,5 +718,17 @@ mod tests {
         let text = parse_formatted_text("Before<i></i>After").unwrap();
         assert_eq!(text.spans.len(), 1);
         assert_eq!(text.spans[0], TextSpan::Plain("BeforeAfter".to_string()));
+    }
+
+    #[test]
+    fn bbo_suit_escapes_are_suits() {
+        // `3!SX`, `!DK` and `K!H` all occur in the corpus, so no word-boundary test
+        assert_eq!(replace_suit_escapes("3!SX, !DK and K!H"), "3♠X, ♦K and K♥");
+        assert_eq!(replace_suit_escapes("!!! 1\\S"), "!!! 1♠");
+        let text = parse_formatted_text("lead the !SK").unwrap();
+        assert!(text.spans.contains(&TextSpan::CardRef {
+            suit: Suit::Spades,
+            rank: Rank::King
+        }));
     }
 }
