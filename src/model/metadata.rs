@@ -139,6 +139,15 @@ impl FontSettings {
     }
 }
 
+/// `%CardTableColors #008000,#ffffff,#aaaaaa`: the card table, its lettering,
+/// and the colour a card already played is drawn in
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct CardTableColors {
+    pub table: (u8, u8, u8),
+    pub letters: (u8, u8, u8),
+    pub played: (u8, u8, u8),
+}
+
 /// Color settings for suits
 #[derive(Debug, Clone)]
 pub struct ColorSettings {
@@ -184,4 +193,5 @@ pub struct PbnMetadata {
     pub layout: LayoutSettings,
     pub fonts: FontSettings,
     pub colors: ColorSettings,
+    pub card_table_colors: Option<CardTableColors>,
 }

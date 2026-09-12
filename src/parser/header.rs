@@ -1,5 +1,5 @@
 use crate::model::metadata::{
-    ColorSettings, FontSpec, Margins, PageFooterCell, PaperSize, PbnMetadata,
+    CardTableColors, ColorSettings, FontSpec, Margins, PageFooterCell, PaperSize, PbnMetadata,
 };
 
 /// Parse a PBN header line starting with %
@@ -59,6 +59,12 @@ pub fn parse_header_line(line: &str) -> Option<HeaderDirective> {
         let value = stripped.trim();
         if let Some(colors) = parse_pip_colors(value) {
             return Some(HeaderDirective::PipColors(colors));
+        }
+    }
+
+    if let Some(stripped) = content.strip_prefix("CardTableColors ") {
+        if let Some(colors) = parse_card_table_colors(stripped) {
+            return Some(HeaderDirective::CardTableColors(colors));
         }
     }
 
@@ -163,6 +169,7 @@ pub enum HeaderDirective {
     PaperSize(PaperSize),
     Font(String, FontSpec),
     PipColors(ColorSettings),
+    CardTableColors(CardTableColors),
     TitleEvent(String),
     TitleDate(String),
     ShowHcp(bool),
@@ -289,6 +296,20 @@ fn parse_pip_colors(value: &str) -> Option<ColorSettings> {
     })
 }
 
+/// Parse %CardTableColors: "#008000,#ffffff,#aaaaaa" -- the table, its
+/// lettering, and the colour of a card already played
+fn parse_card_table_colors(value: &str) -> Option<CardTableColors> {
+    let parts: Vec<&str> = value.split(',').collect();
+    if parts.len() != 3 {
+        return None;
+    }
+    Some(CardTableColors {
+        table: parse_color(parts[0])?,
+        letters: parse_color(parts[1])?,
+        played: parse_color(parts[2])?,
+    })
+}
+
 fn parse_color(value: &str) -> Option<(u8, u8, u8)> {
     let value = value.trim().trim_start_matches('#');
     if value.len() != 6 {
@@ -370,6 +391,7 @@ pub fn parse_headers(lines: &[&str]) -> PbnMetadata {
                     _ => {}
                 },
                 HeaderDirective::PipColors(c) => metadata.colors = c,
+                HeaderDirective::CardTableColors(c) => metadata.card_table_colors = Some(c),
                 HeaderDirective::TitleEvent(t) => metadata.title_event = Some(t),
                 HeaderDirective::TitleDate(d) => metadata.title_date = Some(d),
                 HeaderDirective::ShowHcp(v) => metadata.layout.show_hcp = v,

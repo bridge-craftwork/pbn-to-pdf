@@ -105,6 +105,9 @@ pub struct Settings {
     // Colors (RGB 0.0-1.0)
     pub black_color: (f32, f32, f32),
     pub red_color: (f32, f32, f32),
+    /// `%CardTableColors`' third colour: what a card already played is drawn
+    /// in, when the card table shows the trick (issue #30)
+    pub played_card_color: (f32, f32, f32),
 }
 
 impl Default for Settings {
@@ -166,6 +169,7 @@ impl Default for Settings {
 
             black_color: BLACK_SUIT_COLOR,
             red_color: RED_SUIT_COLOR,
+            played_card_color: (0.667, 0.667, 0.667),
         }
     }
 }
@@ -280,6 +284,14 @@ impl Settings {
             scale(metadata.colors.hearts.1),
             scale(metadata.colors.hearts.2),
         );
+
+        if let Some(card_table) = metadata.card_table_colors {
+            self.played_card_color = (
+                scale(card_table.played.0),
+                scale(card_table.played.1),
+                scale(card_table.played.2),
+            );
+        }
 
         // Store font settings for font family selection
         self.fonts = metadata.fonts.clone();

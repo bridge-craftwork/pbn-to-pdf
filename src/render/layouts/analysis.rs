@@ -223,7 +223,8 @@ impl DocumentRenderer {
 
         // Diagram height
         if visibility.show_diagram {
-            let diagram_options = DiagramDisplayOptions::from_deal(&board.deal, &board.hidden);
+            let diagram_options = DiagramDisplayOptions::from_deal(&board.deal, &board.hidden)
+                .with_trick(board.bc_flags, board.play.as_ref());
 
             // Check for single-card deal - renders just a rank number, not a full diagram
             let is_single_card = board.deal.get_single_visible_card(&board.hidden).is_some();
@@ -885,7 +886,8 @@ impl DocumentRenderer {
             let diagram_x = column_x;
 
             // Compute display options - all visibility decisions are made here
-            let diagram_options = DiagramDisplayOptions::from_deal(&board.deal, &board.hidden);
+            let diagram_options = DiagramDisplayOptions::from_deal(&board.deal, &board.hidden)
+                .with_trick(board.bc_flags, board.play.as_ref());
 
             // Check for single-card deal - render just the rank number instead of a full diagram
             if let Some((_suit, rank)) = board.deal.get_single_visible_card(&board.hidden) {
@@ -1271,7 +1273,8 @@ impl DocumentRenderer {
         // Render diagram centered if enabled
         if show_diagram {
             // Calculate diagram width to center it
-            let diagram_options = DiagramDisplayOptions::from_deal(&board.deal, &board.hidden);
+            let diagram_options = DiagramDisplayOptions::from_deal(&board.deal, &board.hidden)
+                .with_trick(board.bc_flags, board.play.as_ref());
             let hand_renderer = HandDiagramRenderer::new(
                 diagram_fonts.regular,
                 diagram_fonts.bold,
@@ -1825,7 +1828,8 @@ impl DocumentRenderer {
         // Only render diagram if deal has cards
         if !deal_is_empty {
             // Compute display options - all visibility decisions are made here
-            let diagram_options = DiagramDisplayOptions::from_deal(&board.deal, &board.hidden);
+            let diagram_options = DiagramDisplayOptions::from_deal(&board.deal, &board.hidden)
+                .with_trick(board.bc_flags, board.play.as_ref());
 
             let hand_renderer = HandDiagramRenderer::new(
                 diagram_fonts.regular,

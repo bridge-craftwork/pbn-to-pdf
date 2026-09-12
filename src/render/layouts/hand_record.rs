@@ -10,13 +10,14 @@
 //! The title block is page furniture (#28): the omit flag drops it, leaving
 //! its two cells empty so the boards keep their places.
 
-use printpdf::{BuiltinFont, Color, Mm, PdfDocument, PdfPage, PdfSaveOptions, Rgb};
+use printpdf::{BuiltinFont, Color, Mm, PdfPage, PdfSaveOptions, Rgb};
 
 use crate::config::Settings;
 use crate::error::RenderError;
 use crate::model::card::RankExt;
 use crate::model::{Board, Direction, Hand, Suit, SUITS_DISPLAY_ORDER};
 use crate::render::components::page_furniture::spelled_date;
+use crate::render::helpers::document::new_document;
 use crate::render::helpers::colors::{SuitColors, BLACK};
 use crate::render::helpers::compress::compress_pdf;
 use crate::render::helpers::fonts::FontManager;
@@ -69,7 +70,7 @@ impl HandRecordRenderer {
 
     pub fn render(&self, boards: &[Board]) -> Result<Vec<u8>, RenderError> {
         let title = self.title(boards).unwrap_or("Hand Record").to_string();
-        let mut doc = PdfDocument::new(&title);
+        let mut doc = new_document(&title);
         let fonts = FontManager::new(&mut doc)?;
 
         let pages: Vec<PdfPage> = boards
