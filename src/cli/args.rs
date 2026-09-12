@@ -49,7 +49,11 @@ pub struct Args {
     #[arg(long)]
     pub no_commentary: bool,
 
-    /// Hide HCP point counts
+    /// Show HCP point counts even when the PBN does not ask for them
+    #[arg(long, conflicts_with = "no_hcp")]
+    pub hcp: bool,
+
+    /// Hide HCP point counts, even when the PBN asks for them
     #[arg(long)]
     pub no_hcp: bool,
 
@@ -325,9 +329,17 @@ impl Args {
         !self.no_commentary
     }
 
-    /// Check if HCP should be shown
-    pub fn show_hcp(&self) -> bool {
-        !self.no_hcp
+    /// Whether the command line forces the HCP box on or off
+    ///
+    /// BridgeComposer draws it only when the file asks with
+    /// `%BCOptions ShowHCP`, so with neither flag given the PBN decides and
+    /// this is `None`.
+    pub fn hcp_override(&self) -> Option<bool> {
+        match (self.hcp, self.no_hcp) {
+            (true, _) => Some(true),
+            (_, true) => Some(false),
+            _ => None,
+        }
     }
 }
 
@@ -427,6 +439,7 @@ mod tests {
             no_bidding: false,
             no_play: false,
             no_commentary: false,
+            hcp: false,
             no_hcp: false,
             no_page_furniture: false,
             boards: None,
@@ -452,5 +465,41 @@ mod tests {
         assert_eq!(layout("%BoardsPerPage 1"), Layout::Analysis);
         assert_eq!(layout("%BoardsPerPage fit,2"), Layout::Analysis);
         assert_eq!(Layout::default_for(&Default::default()), Layout::Analysis);
+    }
+
+    #[cfg(feature = "cli")]
+    fn hcp_args(hcp: bool, no_hcp: bool) -> Args {
+        Args {
+            input: PathBuf::from("test.pbn"),
+            output: None,
+            boards_per_page: 1,
+            page_size: PageSize::Letter,
+            orientation: Orientation::Portrait,
+            layout: Some(Layout::Analysis),
+            no_bidding: false,
+            no_play: false,
+            no_commentary: false,
+            hcp,
+            no_hcp,
+            no_page_furniture: false,
+            boards: None,
+            margins: None,
+            debug_boxes: false,
+            circle_sure_winners: false,
+            circle_promotable_winners: false,
+            circle_length_winners: false,
+            title: None,
+            verbose: 0,
+        }
+    }
+
+    /// BridgeComposer draws the HCP box only when the file asks for it, so
+    /// with neither flag given the PBN decides (issue #30).
+    #[cfg(feature = "cli")]
+    #[test]
+    fn hcp_flags_say_whether_the_command_line_decided() {
+        assert_eq!(hcp_args(false, false).hcp_override(), None);
+        assert_eq!(hcp_args(true, false).hcp_override(), Some(true));
+        assert_eq!(hcp_args(false, true).hcp_override(), Some(false));
     }
 }

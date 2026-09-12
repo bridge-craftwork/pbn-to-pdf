@@ -35,7 +35,12 @@ pub struct Settings {
     pub show_bidding: bool,
     pub show_play: bool,
     pub show_commentary: bool,
+    /// Whether the HCP box is drawn. BridgeComposer draws it only when the
+    /// file asks with `%BCOptions ShowHCP`, so this starts false and the PBN
+    /// turns it on -- unless the command line decided, see `hcp_override`.
     pub show_hcp: bool,
+    /// `--hcp` / `--no-hcp`: the command line's choice, which beats the file
+    pub hcp_override: Option<bool>,
     /// `%ShowCardTable`: draw the green card table between the hands
     pub show_card_table: bool,
     /// `%ShowBoardLabels`: print the board number, dealer and vulnerability
@@ -129,6 +134,7 @@ impl Default for Settings {
             show_play: true,
             show_commentary: true,
             show_hcp: false,
+            hcp_override: None,
             show_card_table: true,
             show_board_labels: true,
             justify: false,
@@ -208,7 +214,8 @@ impl Settings {
             show_bidding: args.show_bidding(),
             show_play: args.show_play(),
             show_commentary: args.show_commentary(),
-            show_hcp: args.show_hcp(),
+            show_hcp: args.hcp_override().unwrap_or(false),
+            hcp_override: args.hcp_override(),
             show_card_table: true,
             show_board_labels: true,
             debug_boxes: args.debug_boxes,
@@ -296,8 +303,9 @@ impl Settings {
         // Store font settings for font family selection
         self.fonts = metadata.fonts.clone();
 
-        // Apply display options from PBN metadata
-        if metadata.layout.show_hcp {
+        // Apply display options from PBN metadata. `--hcp` and `--no-hcp` beat
+        // the file; with neither, the file decides, as BridgeComposer does.
+        if self.hcp_override.is_none() && metadata.layout.show_hcp {
             self.show_hcp = true;
         }
         if let Some(show) = metadata.layout.show_card_table {
@@ -366,5 +374,45 @@ impl Settings {
     /// Get the total height of the hand diagram (including compass)
     pub fn diagram_height(&self) -> f32 {
         (self.hand_height * 2.0) + self.compass_gap
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::model::metadata::LayoutSettings;
+
+    fn metadata(show_hcp: bool) -> PbnMetadata {
+        PbnMetadata {
+            layout: LayoutSettings {
+                show_hcp,
+                ..Default::default()
+            },
+            ..Default::default()
+        }
+    }
+
+    /// BridgeComposer draws the HCP box only when the file asks with
+    /// `%BCOptions ShowHCP`, and `--hcp` / `--no-hcp` beat the file (#30).
+    #[test]
+    fn show_hcp_follows_the_file_unless_the_command_line_decided() {
+        // With neither flag, the file decides
+        assert!(Settings::default().with_metadata(&metadata(true)).show_hcp);
+        assert!(!Settings::default().with_metadata(&metadata(false)).show_hcp);
+
+        // `--no-hcp` beats a file that asks for it
+        let off = Settings {
+            hcp_override: Some(false),
+            ..Default::default()
+        };
+        assert!(!off.with_metadata(&metadata(true)).show_hcp);
+
+        // `--hcp` beats a file that stays silent
+        let on = Settings {
+            show_hcp: true,
+            hcp_override: Some(true),
+            ..Default::default()
+        };
+        assert!(on.with_metadata(&metadata(false)).show_hcp);
     }
 }
