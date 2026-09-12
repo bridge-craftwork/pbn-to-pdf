@@ -63,6 +63,10 @@ impl From<WasmRenderOptions> for RenderOptions {
             circle_sure_winners: options.circle_sure_winners,
             circle_promotable_winners: options.circle_promotable_winners,
             circle_length_winners: options.circle_length_winners,
+            // Commentary written inside an [Auction] or [Play] section is
+            // section data, which BridgeComposer leaves out. The browser has no
+            // reason to ask for it, so it takes the matching default.
+            section_commentary: false,
         }
     }
 }
