@@ -285,3 +285,95 @@ fn the_card_table_shows_the_trick_as_bare_ranks() {
     assert_eq!(count(&shown, "4"), 2, "West's 4 in the hand and the table");
     assert_eq!(count(&shown, "3"), 2, "North's 3 in the hand and the table");
 }
+
+/// A board carrying `[Contract]` and `[Play]` gets both lines with no
+/// `[Auction]` at all. BridgeComposer 5.118.2 draws `4 \u{2660} by East` and
+/// `Lead: \u{2665} K` on such a board; we drew neither, because both lived
+/// inside the branch that renders the bidding table (issue #48).
+const LEAD: &str = r#"[Board "1"]
+[Dealer "W"]
+[Vulnerable "NS"]
+[Deal "W:QT65.J84.KJ3.AQ6 87.A97.A8542.J95 AKJ43.T3.Q97.K72 92.KQ652.T6.T843"]
+[Declarer "E"]
+[Contract "4S"]
+[BCFlags "FLAGS"]
+AUCTION[Play "S"]
+PLAY
+*
+"#;
+
+fn render_lead_board(flags: &str, auction: &str, play: &str) -> Vec<Vec<u8>> {
+    let pbn = LEAD
+        .replace("FLAGS", flags)
+        .replace("AUCTION", auction)
+        .replace("PLAY", play);
+    let file = parse_pbn(&pbn).unwrap();
+    let pdf = render_boards(
+        &file.boards,
+        &[],
+        Layout::Analysis,
+        RenderOptions::default(),
+    )
+    .unwrap();
+    shown_strings(&pdf)
+}
+
+/// The strings the contract and lead lines are drawn from. Each is split
+/// around its suit glyph, so the tail of the contract and the head of the lead
+/// are what identify them.
+fn has_contract_and_lead(shown: &[Vec<u8>]) -> (bool, bool) {
+    let has = |t: &str| shown.iter().any(|s| s == t.as_bytes());
+    (has(" by East"), has("Lead: "))
+}
+
+#[test]
+fn the_contract_and_lead_do_not_need_an_auction() {
+    // With an auction, as before
+    let shown = render_lead_board(
+        "7e",
+        "[Auction \"W\"]\n1C Pass 1S Pass\n2S Pass 4S AP\n",
+        "HK",
+    );
+    assert_eq!(
+        has_contract_and_lead(&shown),
+        (true, true),
+        "with an auction, both lines"
+    );
+
+    // Without one, BridgeComposer still draws both -- and now so do we
+    let shown = render_lead_board("7e", "", "HK");
+    assert_eq!(
+        has_contract_and_lead(&shown),
+        (true, true),
+        "without an auction, still both lines"
+    );
+}
+
+/// BridgeComposer prints the `Lead:` line only when it has nothing better to
+/// show the play with. 0x800 puts the trick in the card table instead, and
+/// 0x01 puts up the play-record table -- but only when there is a play record
+/// to tabulate, so a lone opening lead still prints as a `Lead:` line. All
+/// four cases probed against 5.118.2 on a board with no `[Auction]`.
+#[test]
+fn the_lead_line_gives_way_to_the_card_table_and_the_play_record() {
+    let lead_shown = |flags: &str, play: &str| {
+        let shown = render_lead_board(flags, "", play);
+        has_contract_and_lead(&shown).1
+    };
+
+    // 0x01 clear, 0x800 clear: the line
+    assert!(lead_shown("7e", "HK"), "7e, lone lead");
+    assert!(lead_shown("7e", "HK H3 H2 HA"), "7e, a whole trick");
+
+    // 0x800 set: the trick goes in the card table, and the line goes
+    assert!(!lead_shown("87e", "HK"), "87e suppresses the line");
+
+    // 0x01 set: the play-record table takes over, but only when there is a
+    // record to tabulate -- ABS1-1's practice deals record just the lead and
+    // BridgeComposer prints `Lead:` for them
+    assert!(lead_shown("7f", "HK"), "7f with only a lead keeps the line");
+    assert!(
+        !lead_shown("7f", "HK H3 H2 HA"),
+        "7f with a real play record drops it"
+    );
+}

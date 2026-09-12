@@ -1,7 +1,9 @@
 use crate::config::Settings;
 use crate::error::RenderError;
 use crate::model::card::RankExt;
-use crate::model::{AuctionExt, BCFlags, BidSuit, Board, CommentaryBlock, CommentarySlot};
+use crate::model::{
+    AuctionExt, BCFlags, BidSuit, Board, Card, CommentaryBlock, CommentarySlot, PlaySequence,
+};
 use printpdf::{BuiltinFont, Color, FontId, Mm, PaintMode, PdfPage, Rgb};
 
 use crate::render::components::bidding_table::BiddingTableRenderer;
@@ -204,6 +206,44 @@ impl<'a> ColumnCommentary<'a> {
     }
 }
 
+/// The opening lead to print on a `Lead:` line, if this board gets one.
+///
+/// The card is the first card of the first trick. BridgeComposer prints the
+/// line only when it has nothing better to show the play with, and it has
+/// something better in two cases -- both probed against 5.118.2:
+///
+/// - `BCFlags` 0x800 draws the trick in the card table instead, which #41
+///   implemented. A board with `[Contract]` and a one-card `[Play]` prints
+///   `Lead: \u{2665} K` under `7e` and `Won NS=0 EW=0` under `87e`.
+/// - `BCFlags` 0x01 ("Show the Play section") draws the play-record table --
+///   the `Trick / 1. W / Lead / 2nd / 3rd / 4th` grid -- but *only when there
+///   is a play record to tabulate*. A single-suit exercise fragment whose
+///   `[Play]` holds a whole trick (`S4 S3 - -`) gets the table and no `Lead:`
+///   line under `1f`; ABS1-1'"'"'s practice deals, whose `[Play]` holds nothing but
+///   the opening lead, get a `Lead:` line and no table under the same bit.
+///
+/// So the bit alone does not decide it: a lone opening lead still prints as
+/// one. The table itself is #42.
+fn opening_lead(board: &Board) -> Option<Card> {
+    let flags = board.bc_flags;
+    if flags.is_some_and(|f| f.show_trick()) {
+        return None;
+    }
+    let play = board.play.as_ref()?;
+    if flags.is_some_and(|f| f.show_play()) && played_card_count(play) > 1 {
+        return None;
+    }
+    play.tricks.first()?.cards[0]
+}
+
+/// How many cards a `[Play]` section actually records, placeholders aside.
+fn played_card_count(play: &PlaySequence) -> usize {
+    play.tricks
+        .iter()
+        .map(|t| t.cards.iter().flatten().count())
+        .sum()
+}
+
 /// A board's `[Event]`, when it has one worth printing
 fn board_event(board: &Board) -> Option<&str> {
     board.event.as_deref().filter(|e| !e.trim().is_empty())
@@ -325,8 +365,18 @@ impl DocumentRenderer {
         }
 
         // Auction height
+        let has_contract = board.contract.is_some();
+        let has_lead = opening_lead(board).is_some();
+        let has_more_below = if self.settings.center {
+            !commentary.below.is_empty()
+        } else {
+            visibility.show_commentary && !board.commentary.is_empty()
+        };
+        let mut measured_auction = false;
+
         if visibility.show_auction {
             if let Some(ref auction) = board.auction {
+                measured_auction = true;
                 // Use narrowed bid column width if 4 columns don't fit
                 let effective_bid_col_width =
                     self.settings.bid_column_width.min(column_width / 4.0);
@@ -356,19 +406,6 @@ impl DocumentRenderer {
                 }
                 height += auction_height;
 
-                let has_contract = board.contract.is_some();
-                let has_lead = board
-                    .play
-                    .as_ref()
-                    .and_then(|p| p.tricks.first())
-                    .and_then(|t| t.cards[0])
-                    .is_some();
-                let has_more_below = if self.settings.center {
-                    !commentary.below.is_empty()
-                } else {
-                    visibility.show_commentary && !board.commentary.is_empty()
-                };
-
                 // Spacing after auction (only if there's contract or lead)
                 if has_contract || has_lead {
                     height += line_height;
@@ -380,22 +417,29 @@ impl DocumentRenderer {
                 if !has_contract && !has_lead && !commentary.below.is_empty() {
                     height += line_height;
                 }
+            }
+        }
 
-                // Contract line
-                if has_contract {
-                    // Only add spacing if there's more content below
-                    if has_lead || has_more_below {
-                        height += line_height;
-                    }
-                }
+        // The contract and lead do not need an auction to be drawn (issue #48),
+        // so they are measured outside it, the way render_board_in_column draws
+        // them.
+        if !measured_auction && (has_contract || has_lead) {
+            height += line_height;
+        }
 
-                // Opening lead line
-                if has_lead {
-                    // Only add spacing if there's more content below
-                    if has_more_below {
-                        height += line_height;
-                    }
-                }
+        // Contract line
+        if has_contract {
+            // Only add spacing if there's more content below
+            if has_lead || has_more_below {
+                height += line_height;
+            }
+        }
+
+        // Opening lead line
+        if has_lead {
+            // Only add spacing if there's more content below
+            if has_more_below {
+                height += line_height;
             }
         }
 
@@ -1089,8 +1133,18 @@ impl DocumentRenderer {
         }
 
         // Render bidding table if present and enabled
+        let has_contract = board.contract.is_some();
+        let has_lead = opening_lead(board).is_some();
+        let has_more_below = if self.settings.center {
+            !commentary.below.is_empty()
+        } else {
+            show_commentary && !board.commentary.is_empty()
+        };
+        let mut drew_auction = false;
+
         if show_auction {
             if let Some(ref auction) = board.auction {
+                drew_auction = true;
                 // Calculate effective bid column width that fits 4 columns in the column
                 // Use the same width for 2-col and 4-col so columns align vertically
                 let effective_bid_col_width =
@@ -1177,19 +1231,6 @@ impl DocumentRenderer {
                     current_y -= table_height;
                 }
 
-                let has_contract = board.contract.is_some();
-                let has_lead = board
-                    .play
-                    .as_ref()
-                    .and_then(|p| p.tricks.first())
-                    .and_then(|t| t.cards[0])
-                    .is_some();
-                let has_more_below = if self.settings.center {
-                    !commentary.below.is_empty()
-                } else {
-                    show_commentary && !board.commentary.is_empty()
-                };
-
                 // Add spacing after auction before contract/lead (only if there's contract or lead)
                 if has_contract || has_lead {
                     current_y -= line_height;
@@ -1201,48 +1242,51 @@ impl DocumentRenderer {
                 if !has_contract && !has_lead && !commentary.below.is_empty() {
                     current_y -= line_height;
                 }
+            }
+        }
 
-                // Render contract (only if explicitly in PBN, not inferred from auction)
-                if let Some(ref contract) = board.contract {
-                    let colors =
-                        SuitColors::new(self.settings.black_color, self.settings.red_color);
-                    self.render_contract(
-                        layer,
-                        contract,
-                        Mm(column_x),
-                        Mm(current_y),
-                        hand_record_fonts.regular,
-                        fonts.symbol_font(),
-                        &colors,
-                    );
-                    // Only add spacing if there's more content below
-                    if has_lead || has_more_below {
-                        current_y -= line_height;
-                    }
-                }
+        // The contract and the opening lead. BridgeComposer draws these from
+        // [Contract] and [Play] whether or not the board has an [Auction]
+        // (issue #48), so they sit outside the auction branch. A column keeps
+        // them at its left edge either way, which is where BridgeComposer puts
+        // them.
+        if !drew_auction && (has_contract || has_lead) {
+            current_y -= line_height;
+        }
 
-                // Render opening lead
-                if let Some(ref play) = board.play {
-                    if let Some(first_trick) = play.tricks.first() {
-                        if let Some(lead_card) = first_trick.cards[0] {
-                            let colors =
-                                SuitColors::new(self.settings.black_color, self.settings.red_color);
-                            self.render_lead(
-                                layer,
-                                &lead_card,
-                                Mm(column_x),
-                                Mm(current_y),
-                                hand_record_fonts.regular,
-                                fonts.symbol_font(),
-                                &colors,
-                            );
-                            // Only add spacing if there's more content below
-                            if has_more_below {
-                                current_y -= line_height;
-                            }
-                        }
-                    }
-                }
+        // Render contract (only if explicitly in PBN, not inferred from auction)
+        if let Some(ref contract) = board.contract {
+            let colors = SuitColors::new(self.settings.black_color, self.settings.red_color);
+            self.render_contract(
+                layer,
+                contract,
+                Mm(column_x),
+                Mm(current_y),
+                hand_record_fonts.regular,
+                fonts.symbol_font(),
+                &colors,
+            );
+            // Only add spacing if there's more content below
+            if has_lead || has_more_below {
+                current_y -= line_height;
+            }
+        }
+
+        // Render opening lead
+        if let Some(lead_card) = opening_lead(board) {
+            let colors = SuitColors::new(self.settings.black_color, self.settings.red_color);
+            self.render_lead(
+                layer,
+                &lead_card,
+                Mm(column_x),
+                Mm(current_y),
+                hand_record_fonts.regular,
+                fonts.symbol_font(),
+                &colors,
+            );
+            // Only add spacing if there's more content below
+            if has_more_below {
+                current_y -= line_height;
             }
         }
 
@@ -1509,9 +1553,18 @@ impl DocumentRenderer {
             content_y = Mm(end - line_height);
         }
 
+        // Where the contract and lead line up. BridgeComposer puts them under
+        // the auction's left edge when there is an auction and under the
+        // diagram's when there is not, which in Center mode are different
+        // places and elsewhere are both the left margin.
+        let mut contract_x = diagram_x;
+        let mut contract_box_width = self.settings.diagram_width();
+        let mut drew_auction = false;
+
         // Render bidding table if present
         if self.settings.show_bidding {
             if let Some(ref auction) = board.auction {
+                drew_auction = true;
                 let bidding_renderer = BiddingTableRenderer::new(
                     hand_record_fonts.regular,
                     hand_record_fonts.bold,
@@ -1533,6 +1586,8 @@ impl DocumentRenderer {
                 } else {
                     margin_left
                 };
+                contract_x = table_x;
+                contract_box_width = table_width;
                 // Notes wrap to the left half when commentary will float on the right,
                 // otherwise run to the right margin.
                 let has_floating_commentary = !center && !commentary.below.is_empty();
@@ -1553,76 +1608,70 @@ impl DocumentRenderer {
                 self.draw_debug_box(layer, table_x, content_y.0, table_width, table_height);
 
                 content_y = Mm(content_y.0 - table_height);
+            }
+        }
 
-                let has_contract = board.contract.is_some();
-                let has_lead = board
-                    .play
-                    .as_ref()
-                    .and_then(|p| p.tricks.first())
-                    .and_then(|t| t.cards[0])
-                    .is_some();
+        // The contract and the opening lead. BridgeComposer draws these from
+        // [Contract] and [Play] whether or not the board has an [Auction]
+        // (issue #48), so they sit outside the auction branch.
+        let has_contract = board.contract.is_some();
+        let has_lead = opening_lead(board).is_some();
 
-                // Add spacing after auction before contract/lead
-                if has_contract || has_lead {
+        if has_contract || has_lead {
+            // Add spacing after the auction, or the diagram, before contract/lead
+            content_y = Mm(content_y.0 - line_height);
+
+            // Render contract (only if explicitly in PBN)
+            if let Some(ref contract) = board.contract {
+                let colors = SuitColors::new(self.settings.black_color, self.settings.red_color);
+                let x = self.render_contract(
+                    layer,
+                    contract,
+                    Mm(contract_x),
+                    content_y,
+                    hand_record_fonts.regular,
+                    fonts.symbol_font(),
+                    &colors,
+                );
+                // Debug box for contract line
+                let contract_width = x - contract_x;
+                self.draw_debug_box(
+                    layer,
+                    contract_x,
+                    content_y.0 + cap_height,
+                    contract_width,
+                    cap_height + descender,
+                );
+                if has_lead {
                     content_y = Mm(content_y.0 - line_height);
                 }
-
-                // Render contract below auction (only if explicitly in PBN)
-                if let Some(ref contract) = board.contract {
-                    let colors =
-                        SuitColors::new(self.settings.black_color, self.settings.red_color);
-                    let x = self.render_contract(
-                        layer,
-                        contract,
-                        Mm(table_x),
-                        content_y,
-                        hand_record_fonts.regular,
-                        fonts.symbol_font(),
-                        &colors,
-                    );
-                    // Debug box for contract line
-                    let contract_width = x - table_x;
-                    self.draw_debug_box(
-                        layer,
-                        table_x,
-                        content_y.0 + cap_height,
-                        contract_width,
-                        cap_height + descender,
-                    );
-                    if has_lead {
-                        content_y = Mm(content_y.0 - line_height);
-                    }
-                }
-
-                // Render opening lead if play sequence exists
-                if let Some(ref play) = board.play {
-                    if let Some(first_trick) = play.tricks.first() {
-                        if let Some(lead_card) = first_trick.cards[0] {
-                            let colors =
-                                SuitColors::new(self.settings.black_color, self.settings.red_color);
-                            self.render_lead(
-                                layer,
-                                &lead_card,
-                                Mm(table_x),
-                                content_y,
-                                hand_record_fonts.regular,
-                                fonts.symbol_font(),
-                                &colors,
-                            );
-                            // Debug box for lead line
-                            self.draw_debug_box(
-                                layer,
-                                table_x,
-                                content_y.0 + cap_height,
-                                table_width,
-                                cap_height + descender,
-                            );
-                        }
-                    }
-                }
-
-                content_y = Mm(content_y.0 - 3.0);
             }
+
+            // Render opening lead if play sequence exists
+            if let Some(lead_card) = opening_lead(board) {
+                let colors = SuitColors::new(self.settings.black_color, self.settings.red_color);
+                self.render_lead(
+                    layer,
+                    &lead_card,
+                    Mm(contract_x),
+                    content_y,
+                    hand_record_fonts.regular,
+                    fonts.symbol_font(),
+                    &colors,
+                );
+                // Debug box for lead line
+                self.draw_debug_box(
+                    layer,
+                    contract_x,
+                    content_y.0 + cap_height,
+                    contract_box_width,
+                    cap_height + descender,
+                );
+            }
+        }
+
+        if drew_auction || has_contract || has_lead {
+            content_y = Mm(content_y.0 - 3.0);
         }
 
         // Center mode: the rest of the commentary, full width below the board
