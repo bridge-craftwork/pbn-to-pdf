@@ -1,5 +1,5 @@
 use crate::model::metadata::{
-    CardTableColors, ColorSettings, FontSpec, Margins, PaperSize, PbnMetadata,
+    CardTableColors, ColorSettings, FontSpec, Margins, PageFooterCell, PaperSize, PbnMetadata,
 };
 
 /// Parse a PBN header line starting with %
@@ -80,6 +80,33 @@ pub fn parse_header_line(line: &str) -> Option<HeaderDirective> {
         return Some(HeaderDirective::TitleDate(date));
     }
 
+    if let Some(stripped) = content.strip_prefix("HRTitleSite ") {
+        return Some(HeaderDirective::TitleSite(unquote(stripped)));
+    }
+
+    if let Some(stripped) = content.strip_prefix("HRTitleSetID ") {
+        return Some(HeaderDirective::TitleSetId(unquote(stripped)));
+    }
+
+    // %PageFooter:0,1 "Presented by\\nGrant Robinson"
+    if let Some(stripped) = content.strip_prefix("PageFooter:") {
+        let (place, text) = stripped.split_once(' ')?;
+        let (row, column) = place.split_once(',')?;
+        return Some(HeaderDirective::PageFooter(PageFooterCell {
+            row: row.trim().parse().ok()?,
+            column: column.trim().parse().ok()?,
+            text: unquote(text),
+        }));
+    }
+
+    // %EventSpacing 12, or %SectionSpacing 12,0,0: points, first value
+    for name in ["EventSpacing ", "SectionSpacing "] {
+        if let Some(stripped) = content.strip_prefix(name) {
+            let first = stripped.split(',').next()?.trim();
+            return Some(HeaderDirective::EventSpacing(first.parse().ok()?));
+        }
+    }
+
     if content.starts_with("ShowHCP") {
         return Some(HeaderDirective::ShowHcp(true));
     }
@@ -116,6 +143,11 @@ pub fn parse_header_line(line: &str) -> Option<HeaderDirective> {
     Some(HeaderDirective::Unknown(content.to_string()))
 }
 
+/// A directive's value with the surrounding quotes taken off.
+fn unquote(value: &str) -> String {
+    value.trim().trim_matches('"').to_string()
+}
+
 /// Options parsed from %BCOptions line
 #[derive(Debug, Clone, Default)]
 pub struct BCOptions {
@@ -124,6 +156,7 @@ pub struct BCOptions {
     pub float: bool,
     pub center: bool,
     pub two_col_auctions: bool,
+    pub page_header: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -142,6 +175,10 @@ pub enum HeaderDirective {
     ShowHcp(bool),
     ShowCardTable(bool),
     ShowBoardLabels(bool),
+    TitleSite(String),
+    TitleSetId(String),
+    PageFooter(PageFooterCell),
+    EventSpacing(f32),
     BCOptions(BCOptions),
     /// Board label format from %Translate "Board %" "%)"
     BoardLabelFormat(String),
@@ -318,7 +355,8 @@ fn parse_bc_options(value: &str) -> BCOptions {
             "Float" => options.float = true,
             "Center" => options.center = true,
             "TwoColAuctions" => options.two_col_auctions = true,
-            _ => {} // Ignore unknown options like NoHRStats, STBorder, STShade, GutterH, GutterV, PageHeader
+            "PageHeader" => options.page_header = true,
+            _ => {} // Ignore unknown options like NoHRStats, STBorder, STShade, GutterH, GutterV
         }
     }
 
@@ -359,6 +397,13 @@ pub fn parse_headers(lines: &[&str]) -> PbnMetadata {
                 HeaderDirective::ShowHcp(v) => metadata.layout.show_hcp = v,
                 HeaderDirective::ShowCardTable(v) => metadata.layout.show_card_table = Some(v),
                 HeaderDirective::ShowBoardLabels(v) => metadata.layout.show_board_labels = Some(v),
+                HeaderDirective::TitleSite(s) => metadata.title_site = Some(s),
+                HeaderDirective::TitleSetId(s) => metadata.title_set_id = Some(s),
+                HeaderDirective::PageFooter(cell) => metadata.page_footers.push(cell),
+                HeaderDirective::EventSpacing(points) => {
+                    // The first one given wins; both spell the same thing
+                    metadata.layout.event_spacing.get_or_insert(points);
+                }
                 HeaderDirective::BCOptions(opts) => {
                     if opts.show_hcp {
                         metadata.layout.show_hcp = true;
@@ -368,6 +413,9 @@ pub fn parse_headers(lines: &[&str]) -> PbnMetadata {
                     }
                     if opts.center {
                         metadata.layout.center = true;
+                    }
+                    if opts.page_header {
+                        metadata.layout.page_header = true;
                     }
                     if opts.two_col_auctions {
                         metadata.layout.two_col_auctions = true;

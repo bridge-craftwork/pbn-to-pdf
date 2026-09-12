@@ -47,6 +47,7 @@ pbn-to-pdf [OPTIONS] <INPUT>
 | `--no-commentary` | Hide commentary text |
 | `--hcp` | Show HCP point counts even when the PBN does not ask for them |
 | `--no-hcp` | Hide HCP point counts, even when the PBN asks for them |
+| `--no-page-furniture` | Leave out the page header or event headings and the `%PageFooter` lines, for pipelines that add their own |
 | `-b, --boards <RANGE>` | Board range to include (e.g., "1-16" or "5,8,12") |
 | `-t, --title [TITLE]` | Title for bidding sheets banner (overrides %HRTitleEvent; use with no value to hide) |
 | `--debug-boxes` | Draw debug boxes around layout regions |
@@ -162,12 +163,12 @@ will not respond to `"1"`.
 For showing what a layout looks like before committing to it, use
 `renderPreview(pbn, layout, options?)`. It renders the opening boards
 positionally — `previewBoardCount(layout)` of them, which is 1 for the 1-up
-plan, 2 for 2-up, 4 for 4-up, 6 for a dealer summary and 5 for bidding sheets —
+plan, 2 for 2-up, 4 for 4-up, 6 for a dealer summary, 18 for a hand record and 5 for bidding sheets —
 so the numbering does not matter. **Show the first page and discard the rest**:
 `bidding-sheets` pages by auction length and `analysis` by commentary length, so
 either can return more than one.
 
-All six layouts preview in about 80 ms together, against ~740 ms for a single
+All seven layouts preview in about 90 ms together, against ~740 ms for a single
 full lesson. `renderFirstBoards(pbn, layout, count, options?)` is the same thing
 with a count you choose.
 

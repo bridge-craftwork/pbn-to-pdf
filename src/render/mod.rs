@@ -8,5 +8,5 @@ pub mod layouts;
 pub use helpers::{get_times_measurer, BuiltinFontMeasurer, FontMetrics, LayerBuilder};
 pub use layouts::{
     generate_pdf, BiddingSheetsRenderer, DealerSummaryRenderer, DeclarersPlan1UpRenderer,
-    DeclarersPlan2UpRenderer, DeclarersPlanRenderer,
+    DeclarersPlan2UpRenderer, DeclarersPlanRenderer, HandRecordRenderer,
 };
