@@ -1,4 +1,6 @@
-use crate::model::metadata::{ColorSettings, FontSpec, Margins, PaperSize, PbnMetadata};
+use crate::model::metadata::{
+    CardTableColors, ColorSettings, FontSpec, Margins, PageFooterCell, PaperSize, PbnMetadata,
+};
 
 /// Parse a PBN header line starting with %
 pub fn parse_header_line(line: &str) -> Option<HeaderDirective> {
@@ -60,6 +62,12 @@ pub fn parse_header_line(line: &str) -> Option<HeaderDirective> {
         }
     }
 
+    if let Some(stripped) = content.strip_prefix("CardTableColors ") {
+        if let Some(colors) = parse_card_table_colors(stripped) {
+            return Some(HeaderDirective::CardTableColors(colors));
+        }
+    }
+
     if let Some(stripped) = content.strip_prefix("HRTitleEvent ") {
         let value = stripped.trim();
         let title = value.trim_matches('"').to_string();
@@ -70,6 +78,33 @@ pub fn parse_header_line(line: &str) -> Option<HeaderDirective> {
         let value = stripped.trim();
         let date = value.trim_matches('"').to_string();
         return Some(HeaderDirective::TitleDate(date));
+    }
+
+    if let Some(stripped) = content.strip_prefix("HRTitleSite ") {
+        return Some(HeaderDirective::TitleSite(unquote(stripped)));
+    }
+
+    if let Some(stripped) = content.strip_prefix("HRTitleSetID ") {
+        return Some(HeaderDirective::TitleSetId(unquote(stripped)));
+    }
+
+    // %PageFooter:0,1 "Presented by\\nGrant Robinson"
+    if let Some(stripped) = content.strip_prefix("PageFooter:") {
+        let (place, text) = stripped.split_once(' ')?;
+        let (row, column) = place.split_once(',')?;
+        return Some(HeaderDirective::PageFooter(PageFooterCell {
+            row: row.trim().parse().ok()?,
+            column: column.trim().parse().ok()?,
+            text: unquote(text),
+        }));
+    }
+
+    // %EventSpacing 12, or %SectionSpacing 12,0,0: points, first value
+    for name in ["EventSpacing ", "SectionSpacing "] {
+        if let Some(stripped) = content.strip_prefix(name) {
+            let first = stripped.split(',').next()?.trim();
+            return Some(HeaderDirective::EventSpacing(first.parse().ok()?));
+        }
     }
 
     if content.starts_with("ShowHCP") {
@@ -108,6 +143,11 @@ pub fn parse_header_line(line: &str) -> Option<HeaderDirective> {
     Some(HeaderDirective::Unknown(content.to_string()))
 }
 
+/// A directive's value with the surrounding quotes taken off.
+fn unquote(value: &str) -> String {
+    value.trim().trim_matches('"').to_string()
+}
+
 /// Options parsed from %BCOptions line
 #[derive(Debug, Clone, Default)]
 pub struct BCOptions {
@@ -116,6 +156,7 @@ pub struct BCOptions {
     pub float: bool,
     pub center: bool,
     pub two_col_auctions: bool,
+    pub page_header: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -128,11 +169,16 @@ pub enum HeaderDirective {
     PaperSize(PaperSize),
     Font(String, FontSpec),
     PipColors(ColorSettings),
+    CardTableColors(CardTableColors),
     TitleEvent(String),
     TitleDate(String),
     ShowHcp(bool),
     ShowCardTable(bool),
     ShowBoardLabels(bool),
+    TitleSite(String),
+    TitleSetId(String),
+    PageFooter(PageFooterCell),
+    EventSpacing(f32),
     BCOptions(BCOptions),
     /// Board label format from %Translate "Board %" "%)"
     BoardLabelFormat(String),
@@ -250,6 +296,20 @@ fn parse_pip_colors(value: &str) -> Option<ColorSettings> {
     })
 }
 
+/// Parse %CardTableColors: "#008000,#ffffff,#aaaaaa" -- the table, its
+/// lettering, and the colour of a card already played
+fn parse_card_table_colors(value: &str) -> Option<CardTableColors> {
+    let parts: Vec<&str> = value.split(',').collect();
+    if parts.len() != 3 {
+        return None;
+    }
+    Some(CardTableColors {
+        table: parse_color(parts[0])?,
+        letters: parse_color(parts[1])?,
+        played: parse_color(parts[2])?,
+    })
+}
+
 fn parse_color(value: &str) -> Option<(u8, u8, u8)> {
     let value = value.trim().trim_start_matches('#');
     if value.len() != 6 {
@@ -295,7 +355,8 @@ fn parse_bc_options(value: &str) -> BCOptions {
             "Float" => options.float = true,
             "Center" => options.center = true,
             "TwoColAuctions" => options.two_col_auctions = true,
-            _ => {} // Ignore unknown options like NoHRStats, STBorder, STShade, GutterH, GutterV, PageHeader
+            "PageHeader" => options.page_header = true,
+            _ => {} // Ignore unknown options like NoHRStats, STBorder, STShade, GutterH, GutterV
         }
     }
 
@@ -330,11 +391,19 @@ pub fn parse_headers(lines: &[&str]) -> PbnMetadata {
                     _ => {}
                 },
                 HeaderDirective::PipColors(c) => metadata.colors = c,
+                HeaderDirective::CardTableColors(c) => metadata.card_table_colors = Some(c),
                 HeaderDirective::TitleEvent(t) => metadata.title_event = Some(t),
                 HeaderDirective::TitleDate(d) => metadata.title_date = Some(d),
                 HeaderDirective::ShowHcp(v) => metadata.layout.show_hcp = v,
                 HeaderDirective::ShowCardTable(v) => metadata.layout.show_card_table = Some(v),
                 HeaderDirective::ShowBoardLabels(v) => metadata.layout.show_board_labels = Some(v),
+                HeaderDirective::TitleSite(s) => metadata.title_site = Some(s),
+                HeaderDirective::TitleSetId(s) => metadata.title_set_id = Some(s),
+                HeaderDirective::PageFooter(cell) => metadata.page_footers.push(cell),
+                HeaderDirective::EventSpacing(points) => {
+                    // The first one given wins; both spell the same thing
+                    metadata.layout.event_spacing.get_or_insert(points);
+                }
                 HeaderDirective::BCOptions(opts) => {
                     if opts.show_hcp {
                         metadata.layout.show_hcp = true;
@@ -344,6 +413,9 @@ pub fn parse_headers(lines: &[&str]) -> PbnMetadata {
                     }
                     if opts.center {
                         metadata.layout.center = true;
+                    }
+                    if opts.page_header {
+                        metadata.layout.page_header = true;
                     }
                     if opts.two_col_auctions {
                         metadata.layout.two_col_auctions = true;

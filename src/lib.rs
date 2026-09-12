@@ -15,7 +15,7 @@ pub use render::generate_pdf;
 use parser::header::parse_headers;
 use render::{
     BiddingSheetsRenderer, DealerSummaryRenderer, DeclarersPlan1UpRenderer,
-    DeclarersPlan2UpRenderer, DeclarersPlanRenderer,
+    DeclarersPlan2UpRenderer, DeclarersPlanRenderer, HandRecordRenderer,
 };
 
 /// Optional rendering flags passed through from library consumers.
@@ -32,6 +32,10 @@ pub struct RenderOptions {
     pub circle_promotable_winners: bool,
     /// Circle length winners in blue (priority 3)
     pub circle_length_winners: bool,
+    /// Leave out the page furniture the PBN asks for -- the event header or
+    /// headings and the `%PageFooter` lines -- for a pipeline that adds its
+    /// own. Off by default, so output matches Bridge Composer's.
+    pub omit_page_furniture: bool,
 }
 
 /// High-level API for rendering boards to PDF.
@@ -90,6 +94,7 @@ pub fn render_boards(
     settings.circle_sure_winners = options.circle_sure_winners;
     settings.circle_promotable_winners = options.circle_promotable_winners;
     settings.circle_length_winners = options.circle_length_winners;
+    settings.page_furniture = !options.omit_page_furniture;
 
     // Route to the appropriate renderer based on layout
     match layout {
@@ -114,5 +119,6 @@ pub fn render_boards(
             let renderer = DealerSummaryRenderer::new(settings);
             renderer.render(boards)
         }
+        Layout::HandRecord => HandRecordRenderer::new(settings).render(boards),
     }
 }

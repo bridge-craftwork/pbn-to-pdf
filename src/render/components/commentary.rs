@@ -24,7 +24,9 @@ fn suit_from_symbol(c: char) -> Option<Suit> {
 /// Parameters for floating layout
 #[derive(Debug, Clone)]
 pub struct FloatLayout {
-    /// Y position below which we switch to full width (page coordinates, so smaller = lower)
+    /// The bottom of the content the text floats beside: a line must lie wholly
+    /// below this before it may run full width (page coordinates, so smaller =
+    /// lower)
     pub float_until_y: f32,
     /// Left margin while floating (right side of page)
     pub float_left: f32,
@@ -34,6 +36,18 @@ pub struct FloatLayout {
     pub full_left: f32,
     /// Max width after clearing float
     pub full_width: f32,
+}
+
+impl FloatLayout {
+    /// Whether a line on `baseline_y`, whose glyphs rise `ascent` above it, lies
+    /// wholly below the floated-beside content and may run full width.
+    ///
+    /// Testing the baseline alone let a full-width line's upper half reach back
+    /// into that content and print over the `Lead:` line beneath the auction
+    /// (issue #29).
+    pub fn clears(&self, baseline_y: f32, ascent: f32) -> bool {
+        baseline_y + ascent < self.float_until_y
+    }
 }
 
 /// Result of rendering with float layout
@@ -387,6 +401,12 @@ impl<'a> CommentaryRenderer<'a> {
         }
     }
 
+    /// How far a line of commentary rises above its baseline.
+    pub fn line_ascent(&self) -> f32 {
+        self.get_regular_measurer()
+            .ascender_mm(self.settings.commentary_font_size)
+    }
+
     /// Measure the height of a commentary block without rendering
     pub fn measure_height(&self, block: &CommentaryBlock, max_width: f32) -> f32 {
         self.measure_formatted_text_height(&block.content, max_width)
@@ -537,7 +557,7 @@ impl<'a> CommentaryRenderer<'a> {
             // Check if we've crossed the float boundary before starting a new line
             if in_float {
                 if let Some(fl) = float_layout {
-                    if y < fl.float_until_y {
+                    if fl.clears(y, regular_measurer.ascender_mm(font_size)) {
                         // Switch to full width layout
                         in_float = false;
                         current_line_start = fl.full_left;

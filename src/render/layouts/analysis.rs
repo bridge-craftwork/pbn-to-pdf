@@ -7,6 +7,7 @@ use printpdf::{BuiltinFont, Color, FontId, Mm, PaintMode, PdfPage, Rgb};
 use crate::render::components::bidding_table::BiddingTableRenderer;
 use crate::render::components::commentary::{CommentaryRenderer, FloatLayout};
 use crate::render::components::hand_diagram::{DiagramDisplayOptions, HandDiagramRenderer};
+use crate::render::components::page_furniture::PageFurniture;
 use crate::render::helpers::colors::{SuitColors, BLACK};
 use crate::render::helpers::compress::compress_pdf;
 use crate::render::helpers::document::new_document;
@@ -188,6 +189,11 @@ impl<'a> ColumnCommentary<'a> {
     }
 }
 
+/// A board's `[Event]`, when it has one worth printing
+fn board_event(board: &Board) -> Option<&str> {
+    board.event.as_deref().filter(|e| !e.trim().is_empty())
+}
+
 /// Main document renderer
 pub struct DocumentRenderer {
     settings: Settings,
@@ -266,7 +272,8 @@ impl DocumentRenderer {
 
         // Diagram height
         if visibility.show_diagram {
-            let diagram_options = DiagramDisplayOptions::from_deal(&board.deal, &board.hidden);
+            let diagram_options = DiagramDisplayOptions::from_deal(&board.deal, &board.hidden)
+                .with_trick(board.bc_flags, board.play.as_ref());
 
             // Check for single-card deal - renders just a rank number, not a full diagram
             let is_single_card = board.deal.get_single_visible_card(&board.hidden).is_some();
@@ -534,25 +541,56 @@ impl DocumentRenderer {
         // Load fonts - printpdf 0.8 handles subsetting automatically
         let fonts = FontManager::new(&mut doc)?;
 
-        let mut pages = Vec::new();
+        // Page furniture (issue #28), unless the caller adds its own
+        let furniture = self
+            .settings
+            .page_furniture
+            .then(|| PageFurniture::new(&self.settings, &fonts));
 
-        if self.settings.column_count >= 2 {
+        let layers = if self.settings.column_count >= 2 {
             // Multi-column layout: fit multiple boards per page
-            pages = self.render_multi_column(boards, &fonts);
+            self.render_multi_column(boards, &fonts, furniture.as_ref())
         } else {
             // Single board per page (original behavior)
+            let mut layers = Vec::new();
             for board in boards {
                 let mut layer = LayerBuilder::new();
-                self.render_board(&mut layer, board, &fonts, self.settings.margin_left);
+                let mut top = self.settings.page_height - self.settings.margin_top;
+                if let (Some(furniture), Some(event)) = (&furniture, board_event(board)) {
+                    if self.settings.page_header {
+                        furniture.draw_header(&mut layer, event);
+                    } else {
+                        top -= furniture.draw_heading(
+                            &mut layer,
+                            event,
+                            self.settings.margin_left,
+                            self.settings.content_width(),
+                            top,
+                        );
+                    }
+                }
+                self.render_board(&mut layer, board, &fonts, self.settings.margin_left, top);
+                layers.push(layer);
+            }
+            layers
+        };
 
-                let page = PdfPage::new(
+        // Footers go on last: they need the page count
+        let page_count = layers.len();
+        let pages = layers
+            .into_iter()
+            .enumerate()
+            .map(|(i, mut layer)| {
+                if let Some(furniture) = &furniture {
+                    furniture.draw_footer(&mut layer, i + 1, page_count);
+                }
+                PdfPage::new(
                     Mm(self.settings.page_width),
                     Mm(self.settings.page_height),
                     layer.into_ops(),
-                );
-                pages.push(page);
-            }
-        }
+                )
+            })
+            .collect();
 
         doc.with_pages(pages);
 
@@ -566,7 +604,12 @@ impl DocumentRenderer {
     }
 
     /// Render boards in multi-column layout with multiple boards per page
-    fn render_multi_column(&self, boards: &[Board], fonts: &FontManager) -> Vec<PdfPage> {
+    fn render_multi_column(
+        &self,
+        boards: &[Board],
+        fonts: &FontManager,
+        furniture: Option<&PageFurniture>,
+    ) -> Vec<LayerBuilder> {
         let mut pages = Vec::new();
 
         let page_width = self.settings.page_width;
@@ -615,6 +658,13 @@ impl DocumentRenderer {
         while board_iter.peek().is_some() {
             let mut layer = LayerBuilder::new();
 
+            // Page header: the event of the page's first board
+            if let Some(furniture) = furniture.filter(|_| self.settings.page_header) {
+                if let Some(event) = board_iter.peek().and_then(|b| board_event(b)) {
+                    furniture.draw_header(&mut layer, event);
+                }
+            }
+
             // Draw vertical separator lines
             layer.set_outline_color(Color::Rgb(SEPARATOR_COLOR));
             layer.set_outline_thickness(SEPARATOR_THICKNESS);
@@ -646,6 +696,20 @@ impl DocumentRenderer {
                 } else {
                     page_width - margin_right
                 };
+
+                // Without a page header, the event heads each column: that of
+                // the board the column starts with
+                if let Some(furniture) = furniture.filter(|_| !self.settings.page_header) {
+                    if let Some(event) = board_iter.peek().and_then(|b| board_event(b)) {
+                        column_y[col_idx] -= furniture.draw_heading(
+                            &mut layer,
+                            event,
+                            col_x,
+                            usable_column_width,
+                            column_y[col_idx],
+                        );
+                    }
+                }
 
                 while let Some(&next) = board_iter.peek() {
                     // Page break marker - force new page
@@ -728,8 +792,7 @@ impl DocumentRenderer {
                 }
             }
 
-            let page = PdfPage::new(Mm(page_width), Mm(page_height), layer.into_ops());
-            pages.push(page);
+            pages.push(layer);
         }
 
         pages
@@ -900,7 +963,8 @@ impl DocumentRenderer {
             let diagram_x = column_x;
 
             // Compute display options - all visibility decisions are made here
-            let diagram_options = DiagramDisplayOptions::from_deal(&board.deal, &board.hidden);
+            let diagram_options = DiagramDisplayOptions::from_deal(&board.deal, &board.hidden)
+                .with_trick(board.bc_flags, board.play.as_ref());
 
             // Check for single-card deal - render just the rank number instead of a full diagram
             if let Some((_suit, rank)) = board.deal.get_single_visible_card(&board.hidden) {
@@ -1257,9 +1321,10 @@ impl DocumentRenderer {
         board: &Board,
         fonts: &FontManager,
         margin_left: f32,
+        top: f32,
     ) {
-        let margin_top = self.settings.margin_top;
-        let page_top = self.settings.page_height - margin_top;
+        // The top of the board: the top margin, or below a page heading
+        let page_top = top;
         let line_height = self.settings.line_height;
 
         // Get font sets based on PBN font specifications
@@ -1380,7 +1445,8 @@ impl DocumentRenderer {
         // Only render diagram if deal has cards
         if !deal_is_empty {
             // Compute display options - all visibility decisions are made here
-            let diagram_options = DiagramDisplayOptions::from_deal(&board.deal, &board.hidden);
+            let diagram_options = DiagramDisplayOptions::from_deal(&board.deal, &board.hidden)
+                .with_trick(board.bc_flags, board.play.as_ref());
 
             let hand_renderer = HandDiagramRenderer::new(
                 diagram_fonts.regular,
@@ -1624,8 +1690,9 @@ impl DocumentRenderer {
                         content_y = Mm(commentary_y);
                     }
                 } else {
-                    // Subsequent blocks: check if we're still above float_until_y
-                    if commentary_y > float_until_y {
+                    // Subsequent blocks float until a line would clear the deal
+                    // content -- the same test render_float applies per line
+                    if !float_layout.clears(commentary_y, commentary_renderer.line_ascent()) {
                         // Still in float zone
                         let block_start_y = commentary_y;
                         let result = commentary_renderer.render_float(

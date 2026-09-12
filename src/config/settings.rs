@@ -35,7 +35,12 @@ pub struct Settings {
     pub show_bidding: bool,
     pub show_play: bool,
     pub show_commentary: bool,
+    /// Whether the HCP box is drawn. BridgeComposer draws it only when the
+    /// file asks with `%BCOptions ShowHCP`, so this starts false and the PBN
+    /// turns it on -- unless the command line decided, see `hcp_override`.
     pub show_hcp: bool,
+    /// `--hcp` / `--no-hcp`: the command line's choice, which beats the file
+    pub hcp_override: Option<bool>,
     /// `%ShowCardTable`: draw the green card table between the hands
     pub show_card_table: bool,
     /// `%ShowBoardLabels`: print the board number, dealer and vulnerability
@@ -59,6 +64,22 @@ pub struct Settings {
     pub title_override: Option<String>,
     /// Title from metadata (HRTitleEvent)
     pub title_from_metadata: Option<String>,
+
+    /// Print the page furniture the PBN asks for: the event header or
+    /// headings and the `%PageFooter` lines (issue #28). On by default, as in
+    /// Bridge Composer; pipelines that add their own turn it off.
+    pub page_furniture: bool,
+    /// `PageHeader` in `%BCOptions`: the event as a header in the top margin,
+    /// rather than as a heading atop each column
+    pub page_header: bool,
+    /// How far above the top margin the page header sits, in points
+    pub event_spacing_pt: f32,
+    /// `%PageFooter` cells
+    pub page_footers: Vec<crate::model::metadata::PageFooterCell>,
+    /// `%HRTitleDate`, `%HRTitleSite` and `%HRTitleSetID`, for footer tokens
+    pub title_date: Option<String>,
+    pub title_site: Option<String>,
+    pub title_set_id: Option<String>,
 
     /// Board label format from %Translate directive
     /// Format string where "%" is replaced with the board number
@@ -89,6 +110,9 @@ pub struct Settings {
     // Colors (RGB 0.0-1.0)
     pub black_color: (f32, f32, f32),
     pub red_color: (f32, f32, f32),
+    /// `%CardTableColors`' third colour: what a card already played is drawn
+    /// in, when the card table shows the trick (issue #30)
+    pub played_card_color: (f32, f32, f32),
 }
 
 impl Default for Settings {
@@ -110,6 +134,7 @@ impl Default for Settings {
             show_play: true,
             show_commentary: true,
             show_hcp: false,
+            hcp_override: None,
             show_card_table: true,
             show_board_labels: true,
             justify: false,
@@ -122,6 +147,13 @@ impl Default for Settings {
             center: false,
             title_override: None,
             title_from_metadata: None,
+            page_furniture: true,
+            page_header: false,
+            event_spacing_pt: 0.0,
+            page_footers: Vec::new(),
+            title_date: None,
+            title_site: None,
+            title_set_id: None,
             board_label_format: "Board %".to_string(),
 
             hand_width: DEFAULT_HAND_WIDTH,
@@ -143,6 +175,7 @@ impl Default for Settings {
 
             black_color: BLACK_SUIT_COLOR,
             red_color: RED_SUIT_COLOR,
+            played_card_color: (0.667, 0.667, 0.667),
         }
     }
 }
@@ -157,10 +190,10 @@ impl Settings {
         let (margin_lr, margin_tb) = if let Some(preset) = args.margins {
             let m = preset.size_mm();
             (m, m)
-        } else if args.layout == Layout::BiddingSheets {
+        } else if args.layout() == Layout::BiddingSheets {
             // Bidding sheets use standard margins by default
             (BIDDING_SHEETS_MARGIN, BIDDING_SHEETS_MARGIN)
-        } else if args.layout.is_declarers_plan() {
+        } else if args.layout().is_declarers_plan() {
             // Declarer's plan uses 0.5" left/right, 1.0" top/bottom
             (DECLARERS_PLAN_MARGIN_LR, DECLARERS_PLAN_MARGIN_TB)
         } else {
@@ -177,11 +210,12 @@ impl Settings {
             margin_right: margin_lr,
             boards_per_page: args.boards_per_page,
             margin_preset: args.margins,
-            layout: args.layout,
+            layout: args.layout(),
             show_bidding: args.show_bidding(),
             show_play: args.show_play(),
             show_commentary: args.show_commentary(),
-            show_hcp: args.show_hcp(),
+            show_hcp: args.hcp_override().unwrap_or(false),
+            hcp_override: args.hcp_override(),
             show_card_table: true,
             show_board_labels: true,
             debug_boxes: args.debug_boxes,
@@ -189,6 +223,7 @@ impl Settings {
             circle_promotable_winners: args.circle_promotable_winners,
             circle_length_winners: args.circle_length_winners,
             title_override: args.title.clone(),
+            page_furniture: !args.no_page_furniture,
             ..Default::default()
         }
     }
@@ -201,7 +236,7 @@ impl Settings {
                 (DECLARERS_PLAN_MARGIN_LR, DECLARERS_PLAN_MARGIN_TB)
             }
             Layout::DealerSummary => (DECLARERS_PLAN_MARGIN_LR, DECLARERS_PLAN_MARGIN_TB),
-            Layout::Analysis => (DEFAULT_PAGE_MARGIN, DEFAULT_PAGE_MARGIN),
+            Layout::Analysis | Layout::HandRecord => (DEFAULT_PAGE_MARGIN, DEFAULT_PAGE_MARGIN),
         };
 
         Self {
@@ -224,7 +259,10 @@ impl Settings {
         // Apply PBN margins only if:
         // 1. No CLI margin override was specified, AND
         // 2. Layout is Analysis (bidding sheets and declarer's plan ignore embedded margins)
-        if self.margin_preset.is_none() && self.layout == Layout::Analysis {
+        // The hand record is BridgeComposer's too, and follows them as well.
+        if self.margin_preset.is_none()
+            && matches!(self.layout, Layout::Analysis | Layout::HandRecord)
+        {
             if let Some(ref margins) = metadata.layout.margins {
                 self.margin_top = margins.top;
                 self.margin_bottom = margins.bottom;
@@ -254,11 +292,20 @@ impl Settings {
             scale(metadata.colors.hearts.2),
         );
 
+        if let Some(card_table) = metadata.card_table_colors {
+            self.played_card_color = (
+                scale(card_table.played.0),
+                scale(card_table.played.1),
+                scale(card_table.played.2),
+            );
+        }
+
         // Store font settings for font family selection
         self.fonts = metadata.fonts.clone();
 
-        // Apply display options from PBN metadata
-        if metadata.layout.show_hcp {
+        // Apply display options from PBN metadata. `--hcp` and `--no-hcp` beat
+        // the file; with neither, the file decides, as BridgeComposer does.
+        if self.hcp_override.is_none() && metadata.layout.show_hcp {
             self.show_hcp = true;
         }
         if let Some(show) = metadata.layout.show_card_table {
@@ -282,6 +329,14 @@ impl Settings {
 
         // Store title from metadata (HRTitleEvent)
         self.title_from_metadata = metadata.title_event.clone();
+
+        // Page furniture (issue #28)
+        self.page_header = metadata.layout.page_header;
+        self.event_spacing_pt = metadata.layout.event_spacing.unwrap_or(0.0);
+        self.page_footers = metadata.page_footers.clone();
+        self.title_date = metadata.title_date.clone();
+        self.title_site = metadata.title_site.clone();
+        self.title_set_id = metadata.title_set_id.clone();
 
         // Apply board label format from %Translate directive
         if let Some(ref fmt) = metadata.layout.board_label_format {
@@ -319,5 +374,45 @@ impl Settings {
     /// Get the total height of the hand diagram (including compass)
     pub fn diagram_height(&self) -> f32 {
         (self.hand_height * 2.0) + self.compass_gap
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::model::metadata::LayoutSettings;
+
+    fn metadata(show_hcp: bool) -> PbnMetadata {
+        PbnMetadata {
+            layout: LayoutSettings {
+                show_hcp,
+                ..Default::default()
+            },
+            ..Default::default()
+        }
+    }
+
+    /// BridgeComposer draws the HCP box only when the file asks with
+    /// `%BCOptions ShowHCP`, and `--hcp` / `--no-hcp` beat the file (#30).
+    #[test]
+    fn show_hcp_follows_the_file_unless_the_command_line_decided() {
+        // With neither flag, the file decides
+        assert!(Settings::default().with_metadata(&metadata(true)).show_hcp);
+        assert!(!Settings::default().with_metadata(&metadata(false)).show_hcp);
+
+        // `--no-hcp` beats a file that asks for it
+        let off = Settings {
+            hcp_override: Some(false),
+            ..Default::default()
+        };
+        assert!(!off.with_metadata(&metadata(true)).show_hcp);
+
+        // `--hcp` beats a file that stays silent
+        let on = Settings {
+            show_hcp: true,
+            hcp_override: Some(true),
+            ..Default::default()
+        };
+        assert!(on.with_metadata(&metadata(false)).show_hcp);
     }
 }

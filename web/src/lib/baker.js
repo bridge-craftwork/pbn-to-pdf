@@ -26,6 +26,7 @@ export const VIEW_FOR_LAYOUT = {
   'bidding-sheets': 'North-South',
   'dealer-summary': 'Full Table',
   analysis: 'Full Table',
+  'hand-record': 'Full Table',
 }
 
 /// Opens on a declarer-play lesson, not a bidding one. Its boards carry an
