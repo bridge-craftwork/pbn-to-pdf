@@ -376,8 +376,12 @@ silently if it is not:
 - **Section data on the tag line.** `[Play "W"]SJ` jams the first datum onto the
   tag. For a Play section that datum is the opening lead, so dropping the line
   loses the tag *and* the lead — 6,656 of them across Baker Bridge, each
-  rendering a declarer's plan with no lead box and no complaint. Accepting is
-  not endorsement; Baker-Bridge#42 tracks fixing the producer.
+  rendering a declarer's plan with no lead box and no complaint. Baker-Bridge#42
+  has since fixed the producer: `CSV_to_PBN.py` writes the card on the line that
+  follows, and every Baker Bridge tree that is built or consumed now parses
+  cleanly — only the frozen `Package/`, which nothing builds from, still holds
+  the old form. The leniency here stays, for the files already in the wild and
+  for other producers.
 - **Annotated calls.** `1C!`, `2H=1=` and a standalone `=1=` all annotate a
   call. Parsing the raw token as a call fails, and a *dropped* call shifts every
   later call one seat — a wrong auction that still looks like an auction.
