@@ -157,16 +157,21 @@ impl<'a> ColumnCommentary<'a> {
         }
         let flags = board.bc_flags;
         let blocks = board.commentary.iter().filter(|c| !c.is_blank());
+        let allowed = |bit: fn(&BCFlags) -> bool| flags.map(|f| bit(&f)).unwrap_or(true);
         if !settings.center {
-            if flags
-                .map(|f| f.show_event_commentary() || f.show_final_commentary())
-                .unwrap_or(true)
-            {
-                shown.below = blocks.collect();
-            }
+            // Outside Center mode every block BridgeComposer shows goes below
+            // the board, but it shows the same ones: each under its own bit,
+            // and one between [Board] and [Deal] never
+            shown.below = blocks
+                .filter(|block| match block.slot {
+                    CommentarySlot::Event => allowed(BCFlags::show_event_commentary),
+                    CommentarySlot::BeforeDeal => false,
+                    CommentarySlot::Diagram => allowed(BCFlags::show_diagram_commentary),
+                    CommentarySlot::Final => allowed(BCFlags::show_final_commentary),
+                })
+                .collect();
             return shown;
         }
-        let allowed = |bit: fn(&BCFlags) -> bool| flags.map(|f| bit(&f)).unwrap_or(true);
         for block in blocks {
             match block.slot {
                 CommentarySlot::Event if allowed(BCFlags::show_event_commentary) => {
@@ -359,9 +364,10 @@ impl DocumentRenderer {
                     height += line_height;
                 }
 
-                // Center mode: with no contract or lead to step past, the
-                // commentary under the auction needs its own line's gap
-                if self.settings.center && !has_contract && !has_lead && has_more_below {
+                // With no contract or lead to step past, the commentary under
+                // the auction needs a line's gap of its own, or its first line
+                // prints on the last call
+                if !has_contract && !has_lead && !commentary.below.is_empty() {
                     height += line_height;
                 }
 
@@ -1179,9 +1185,10 @@ impl DocumentRenderer {
                     current_y -= line_height;
                 }
 
-                // Center mode: with no contract or lead to step past, the
-                // commentary under the auction needs its own line's gap
-                if self.settings.center && !has_contract && !has_lead && has_more_below {
+                // With no contract or lead to step past, the commentary under
+                // the auction needs a line's gap of its own, or its first line
+                // prints on the last call
+                if !has_contract && !has_lead && !commentary.below.is_empty() {
                     current_y -= line_height;
                 }
 
@@ -1518,9 +1525,7 @@ impl DocumentRenderer {
                 };
                 // Notes wrap to the left half when commentary will float on the right,
                 // otherwise run to the right margin.
-                let has_floating_commentary = !center
-                    && self.settings.show_commentary
-                    && board.commentary.iter().any(|c| !c.is_blank());
+                let has_floating_commentary = !center && !commentary.below.is_empty();
                 let notes_max_width = if has_floating_commentary {
                     self.settings.content_width() / 2.0 - 2.0
                 } else {
@@ -1620,7 +1625,7 @@ impl DocumentRenderer {
                 content_y.0 - line_height,
                 self.settings.content_width(),
             );
-        } else if self.settings.show_commentary && board.commentary.iter().any(|c| !c.is_blank()) {
+        } else if !commentary.below.is_empty() {
             // Render commentary - using floating layout
             let commentary_renderer = CommentaryRenderer::new(
                 commentary_fonts.regular,
@@ -1657,8 +1662,7 @@ impl DocumentRenderer {
                 get_times_measurer().cap_height_mm(self.settings.commentary_font_size);
             let mut commentary_y = page_top - commentary_cap;
             let mut first_block = true;
-            let non_blank_blocks: Vec<_> =
-                board.commentary.iter().filter(|c| !c.is_blank()).collect();
+            let non_blank_blocks = commentary.below.clone();
 
             let commentary_asc =
                 get_times_measurer().ascender_mm(self.settings.commentary_font_size);
