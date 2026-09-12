@@ -1,7 +1,7 @@
 use crate::config::Settings;
 use crate::error::RenderError;
 use crate::model::card::RankExt;
-use crate::model::{AuctionExt, BCFlags, BidSuit, Board, CommentaryBlock, CommentarySlot, Suit};
+use crate::model::{AuctionExt, BCFlags, BidSuit, Board, CommentaryBlock, CommentarySlot};
 use printpdf::{BuiltinFont, Color, FontId, Mm, PaintMode, PdfDocument, PdfPage, Rgb};
 
 use crate::render::components::bidding_table::BiddingTableRenderer;
