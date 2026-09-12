@@ -737,6 +737,10 @@ impl<'a> HandDiagramRenderer<'a> {
 
     /// Render compass rose with green filled box and white letters
     fn render_compass(&self, layer: &mut LayerBuilder, center: (Mm, Mm)) {
+        // `%ShowCardTable 0` leaves the space and draws nothing in it
+        if !self.settings.show_card_table {
+            return;
+        }
         let (cx, cy) = center;
         let measurer = text_metrics::get_times_measurer();
         let font_size = self.settings.compass_font_size;

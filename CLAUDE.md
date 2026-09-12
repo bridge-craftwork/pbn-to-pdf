@@ -278,6 +278,14 @@ a build doing the same sequence of renders is reproducible — but two renders o
 the same input inside one process differ in that tag. That is why the test runs
 the binary twice instead of calling `render_boards` twice.
 
+Every PDF names the build that made it: `/Producer` and `/Creator` read
+`pbn-to-pdf <version>`, stamped by `helpers::document::new_document`, which is
+the only place a layout should create its document. The dates stay at printpdf's
+fixed defaults. So a version bump rewrites every committed PDF on its next
+rebuild even with nothing visible changed — deterministic, and only on a
+release, which is the trade issue #23 accepted for a PDF that can say how old it
+is.
+
 ## Card asset pipeline
 
 `assets/cards/*.svg` are the 52 base cards; `assets/cards/variants/` holds the
