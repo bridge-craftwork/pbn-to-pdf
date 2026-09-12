@@ -47,6 +47,10 @@ pub struct WasmRenderOptions {
     /// Circle length winners in blue.
     #[wasm_bindgen(js_name = circleLengthWinners)]
     pub circle_length_winners: bool,
+    /// Leave out the page furniture -- event header or headings and the
+    /// `%PageFooter` lines. Off by default, matching Bridge Composer.
+    #[wasm_bindgen(js_name = omitPageFurniture)]
+    pub omit_page_furniture: bool,
 }
 
 #[wasm_bindgen(js_class = RenderOptions)]
@@ -63,6 +67,7 @@ impl From<WasmRenderOptions> for RenderOptions {
             circle_sure_winners: options.circle_sure_winners,
             circle_promotable_winners: options.circle_promotable_winners,
             circle_length_winners: options.circle_length_winners,
+            omit_page_furniture: options.omit_page_furniture,
         }
     }
 }

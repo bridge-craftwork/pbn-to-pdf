@@ -97,6 +97,32 @@ Every layout renders pixel-identical in native and wasm, verified by
 rasterizing both and comparing. That depends on the card rank indices being
 vector paths rather than `<text>` — see below.
 
+### Footprint
+
+`node wasm/measure-memory.mjs [file.pbn]` (after the same nodejs build) reports
+where the engine's bytes go. As of the #26 card-art pass, measured in Node, which
+uses the same V8 engine as Chrome:
+
+| | |
+|---|---|
+| download | 17.65 MB raw, 7.43 MB gzipped |
+| module | 7.26 MiB code, 9.56 MiB static data (about half of it card art) |
+| memory at load | 10.69 MiB |
+| peak, 8-board declarer's plan | 25.88 MiB |
+| peak, analysis or bidding sheets | 12.50 MiB |
+
+Three properties matter more than the numbers:
+
+- **Static data costs memory, not just download.** The card art is compiled in
+  with `include_str!` and parsed as a borrowed `&'static str`, so it is never
+  copied onto the heap — but wasm copies every data segment into linear memory
+  at instantiation. Shrinking the art shrinks the tab's footprint whether or not
+  a card layout is ever rendered.
+- **Linear memory never shrinks.** The peak is what a tab holds for as long as
+  the engine stays loaded, so the heaviest layout sets the cost of the session.
+- **It plateaus.** A second pass of every layout adds nothing, which the script
+  checks: growth there would mean a leak.
+
 ## Web app
 
 `web/` is a Vite + Vue 3 front-end over the wasm build, deployed to Cloudflare
@@ -110,8 +136,8 @@ A few things in `web/vite.config.js` are load-bearing rather than decorative:
 - `optimizeDeps.exclude` on the generated module — `wasm-pack --target web`
   loads the binary with `new URL('..._bg.wasm', import.meta.url)`, and dep
   optimisation would rewrite that URL in dev.
-- `manualChunks` puts the engine in its own content-hashed chunk. It is ~21 MB
-  and changes rarely; app code is ~30 kB gzipped. Without the split every
+- `manualChunks` puts the engine in its own content-hashed chunk. It is about
+  17.7 MB (7.4 MB gzipped) and changes rarely; app code is ~30 kB gzipped. Without the split every
   app-code deploy re-downloads the engine for everyone.
 
 The lesson library is the **Rotations** export of Baker Bridge, read from its
@@ -143,7 +169,7 @@ The page is laid out so the generated PDF is visible without scrolling. That is
 what drives three choices that would otherwise look arbitrary. The lesson
 library and the enlarged previews are `<dialog>` modals, not page sections: both
 are big, both are consulted briefly, and on the page they pushed the result
-below the fold *and* put a scroll region inside a scroll region. All six layouts
+below the fold *and* put a scroll region inside a scroll region. All seven layouts
 sit on one row, which makes each thumbnail too small to read a diagram in —
 hence clicking one, which re-renders that preview into a modal PDF viewer rather
 than upscaling the thumbnail (one preview is a few milliseconds, against holding
@@ -177,7 +203,7 @@ is a real capacity, and the integration test asserts it by rendering: that many
 boards fill one page and one more spills. For `analysis` and `bidding-sheets` it
 is a *sample*, because their paging follows commentary and auction length
 respectively — consumers render the preview and show only its first page. All
-six layouts preview in ~80 ms together, against ~740 ms for one full lesson.
+seven layouts preview in ~90 ms together, against ~740 ms for one full lesson.
 
 Testing has three layers, because each misses what the others catch:
 `npm test` (vitest) covers the pure logic, `node wasm/verify.mjs` covers the
@@ -263,7 +289,7 @@ Integration tests generate PDFs in `tests/output/` for visual verification:
 Rendering the same input twice must produce the same bytes: Baker Bridge commits
 its packaged PDFs, and non-determinism rewrites 184 files on every rebuild for no
 content change. `rendering_is_byte_reproducible_across_runs` guards this for all
-six layouts.
+seven layouts.
 
 Anything that reaches the PDF in iteration order has to be ordered deliberately.
 `CardAssets::load_faces` sorts before registering XObjects because a `HashSet`'s
@@ -350,8 +376,12 @@ silently if it is not:
 - **Section data on the tag line.** `[Play "W"]SJ` jams the first datum onto the
   tag. For a Play section that datum is the opening lead, so dropping the line
   loses the tag *and* the lead — 6,656 of them across Baker Bridge, each
-  rendering a declarer's plan with no lead box and no complaint. Accepting is
-  not endorsement; Baker-Bridge#42 tracks fixing the producer.
+  rendering a declarer's plan with no lead box and no complaint. Baker-Bridge#42
+  has since fixed the producer: `CSV_to_PBN.py` writes the card on the line that
+  follows, and every Baker Bridge tree that is built or consumed now parses
+  cleanly — only the frozen `Package/`, which nothing builds from, still holds
+  the old form. The leniency here stays, for the files already in the wild and
+  for other producers.
 - **Annotated calls.** `1C!`, `2H=1=` and a standalone `=1=` all annotate a
   call. Parsing the raw token as a call fails, and a *dropped* call shifts every
   later call one seat — a wrong auction that still looks like an auction.
