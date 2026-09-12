@@ -488,27 +488,6 @@ fn label_font(pdf: &[u8], text: &str) -> Option<String> {
     None
 }
 
-#[test]
-fn probe_winner_populated() {
-    let pbn = std::fs::read_to_string(
-        "/Users/rick/Development/GitHub/pbn-to-pdf/tests/output/probe42/play.pbn",
-    )
-    .unwrap();
-    let file = parse_pbn(&pbn).unwrap();
-    let b = &file.boards[0];
-    eprintln!("contract {:?}", b.contract);
-    for (i, t) in b.play.as_ref().unwrap().tricks.iter().enumerate() {
-        eprintln!(
-            "T{} leader={:?} lead_suit={:?} winner={:?} cards={:?}",
-            i + 1,
-            t.leader,
-            t.lead_suit,
-            t.winner,
-            t.cards
-        );
-    }
-}
-
 /// BridgeComposer puts up a play-record table in place of the `Lead:` line —
 /// `Trick / Lead / 2nd / 3rd / 4th`, one row per trick (#42).
 ///
