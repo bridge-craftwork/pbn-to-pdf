@@ -1,0 +1,276 @@
+% PBN 2.1
+% EXPORT
+%Content-type: text/x-pbn; charset=UTF-8
+%Creator: BridgeComposer Version 5.93
+%Created: Tue Jan 11 11:14:06 2022 -0800
+%BCOptions Center GutterH GutterV Justify NoHRStats PageHeader STBorder STShade TwoColAuctions
+%BidAndCardSpacing Thin
+%BoardsPerPage fit,2
+%CardTableColors #008000,#ffffff,#aaaaaa
+%DefaultPagination 0
+%EventSpacing 12
+%Font:CardTable "Arial",11,400,0
+%Font:Commentary "Times New Roman",13,400,0
+%Font:Diagram "Times New Roman",13,400,0
+%Font:Event "Times New Roman",22,700,0
+%Font:FixedPitch "Courier New",10,400,0
+%Font:HandRecord "Tempus Sans ITC",12,400,0
+%GutterSize 250,250
+%HRTitleDate 0
+%HRTitleEvent "2/1 GF-1"
+%HRTitleSetID ""
+%HRTitleSetIDPrefix ""
+%HRTitleSite ""
+%HtmlClubs entity,"http://bridgecomposer.com/suitimg/c.gif"
+%HtmlDiamonds entity,"http://bridgecomposer.com/suitimg/d.gif"
+%HtmlHearts entity,"http://bridgecomposer.com/suitimg/h.gif"
+%HtmlNavBar 0.75,#cfe2f3
+%HtmlSpades entity,"http://bridgecomposer.com/suitimg/s.gif"
+%Margins 1000,1000,1000,750
+%PageFooter:0,0 "%D\\n%s"
+%PageFooter:0,1 "Grant Robinson\\ngrant4bridge.com"
+%PageFooter:0,2 "%n"
+%PaperSize 1,2159,2794,2
+%ParaIndent 0
+%PipColors #000000,#ff0000,#ff0000,#000000
+%PipFont "Cards Decorative","Cards",0,0x53,0x48,0x44,0x43
+%ScoreTableColors #e6e6e6,#000000
+%SelectedBoard 5
+%ShowBoardLabels 1
+%ShowCardTable 2
+%TSTCustomSortOrder Default
+%TSTReport List
+%TSTReportOrder ByNumber
+%TSTReportShade Yes
+%Translate "Board %" "%)"
+[Event "Two-Over-One Game Forcing"]
+[Site ""]
+[Date ""]
+[Board "1"]
+[West ""]
+[North ""]
+[East ""]
+[South ""]
+[Dealer "N"]
+[Vulnerable "None"]
+[Deal ""]
+[Scoring ""]
+[Declarer ""]
+[Contract ""]
+[Result ""]
+{<b>What is 2/1 GF?</b>
+
+• Two-over-one responses…
+
+  – Are natural
+
+  – Promise opening values
+
+  – Are forcing to game
+
+• Affects some other bids:
+
+  – Rebids after a 2/1 GF response are affected profoundly
+
+  – 1NT response to 1\H or 1\S opening bid shows 6–<u>12</u> points
+
+  – Jump-shifts to the three-level are natural and invitational (recommended)
+
+• Does not affect any other bidding!}
+[BCFlags "17"]
+
+[Event ""]
+[Site ""]
+[Date ""]
+[Board ""]
+[West ""]
+[North ""]
+[East ""]
+[South ""]
+[Dealer ""]
+[Vulnerable ""]
+[Deal ""]
+[Scoring ""]
+[Declarer ""]
+[Contract ""]
+[Result ""]
+{<b>Why Play 2/1 GF?</b>
+
+• Standard 2/1 responses can leave the partnership in “no man's land,”
+uncertain of where and how high to bid
+
+• 2/1 responses establish a forcing situation that permits careful exploration
+for the best strain, and whether slam is a good bet
+
+• Used by nearly all expert players who play a natural system}
+[BCFlags "17"]
+
+[Event ""]
+[Site ""]
+[Date ""]
+[Board "Example 1"]
+[West ""]
+[North ""]
+[East ""]
+[South ""]
+[Dealer "S"]
+[Vulnerable "None"]
+[Deal "S:... ... Kx.Qxx.Qxxx.AJxx ..."]
+[Scoring ""]
+[Declarer ""]
+[Contract ""]
+{Using standard bidding, North responds 2\C, but then is in a quandary whether
+to pass 2NT or bid 3NT.}
+[Result ""]
+[BCFlags "60009f"]
+[Hidden "SWE"]
+[Auction "S"]
+1S Pass 2C Pass
+2NT Pass + $4
+
+[Event ""]
+[Site ""]
+[Date ""]
+[Board ""]
+[West ""]
+[North ""]
+[East ""]
+[South ""]
+[Dealer ""]
+[Vulnerable ""]
+[Deal ""]
+[Scoring ""]
+[Declarer ""]
+[Contract ""]
+[Result ""]
+{<b>Requirements for a 2/1 GF Response</b>
+
+• 13 total points
+
+• Usually a 5-card suit, but may be done with 4, or rarely 3 if no better bid
+
+  !!! 1\S–2\H promises five, just as in standard
+
+• Does not apply if responder is a passed hand
+
+• Does not apply if there is competition (double or overcall)}
+[BCFlags "17"]
+
+[Event ""]
+[Site ""]
+[Date ""]
+[Board ""]
+[West ""]
+[North ""]
+[East ""]
+[South ""]
+[Dealer ""]
+[Vulnerable ""]
+[Deal ""]
+[Scoring ""]
+[Declarer ""]
+[Contract ""]
+[Result ""]
+{<b>Opener's Rebid after 2/1 GF</b>
+
+Opener's rebid shows shape of hand <u>without regard to strength of hand</u>:
+
+• Rebid suit with 6+ cards
+
+• Bid a new suit (4+ cards), even if a reverse (recommended)
+
+• Bid 2NT (balanced, 12–14 or 18–19)
+
+• Bid 3NT (balanced, 15–17)
+
+• Raise responder
+
+• Jumps are rare and show special hands}
+[BCFlags "17"]
+
+[Event ""]
+[Site ""]
+[Date ""]
+[Board ""]
+[West ""]
+[North ""]
+[East ""]
+[South ""]
+[Dealer ""]
+[Vulnerable ""]
+[Deal ""]
+[Scoring ""]
+[Declarer ""]
+[Contract ""]
+[Result ""]
+{<b>Responder's Rebid after 2/1 GF</b>
+
+Responder's rebid shows shape and may clarify strength:
+
+<i><u>Shape</u></i>
+
+  – Delayed raise of opener's major shows 3-card support, never 2 or 4
+
+  – Raise of opener's second suit shows 4-card support, never 3
+
+  – Rebid 6-card suit
+
+  – Bid a second 4-card suit
+
+  – Bid notrump with a balanced hand}
+[BCFlags "17"]
+
+[Event ""]
+[Site ""]
+[Date ""]
+[Board ""]
+[West ""]
+[North ""]
+[East ""]
+[South ""]
+[Dealer ""]
+[Vulnerable ""]
+[Deal ""]
+[Scoring ""]
+[Declarer ""]
+[Contract ""]
+[Result ""]
+{<b>Principle of Fast Arrival</b>
+
+• In a game-forcing auction, jumping straight to game is the weakest auction by
+either player.
+
+• Delayed raise:
+
+  1\S–2\H; 2NT–4\S
+
+       3 spades, minimum values\n
+       (13–15 support points)
+
+       Possible hands:\n
+       \SK Q 2  \HA Q 10 8 7  \D10 4  \CJ 4 2\n
+       \SJ 5 4  \HA K 8 7 6  \DK 5 4  \CQ 2
+
+  1\S–2\H; 2NT–3\S\n
+       3 spades, extra values\n
+       (16+ support points)
+
+       Possible hands:\n
+       \SK 4 2  \HA Q 8 7 6  \DA 2  \CK 3 2\n
+       \SJ T 8  \HA K Q 8 7  \DQ 2  \CA Q 2
+
+• Implied fit:
+
+  1\S–2\H; 2NT–3\H vs. 4\H
+
+• Opener can do, also:
+
+  1\S–2\H; 3\H vs. 4\H\n
+  1\H–2\D; 3\D vs. 5\D (rare)
+
+• What about notrump?
+
+  1\H–2\C; 2\D–2NT vs. 3NT
+
+       More on this later}
+[BCFlags "17"]

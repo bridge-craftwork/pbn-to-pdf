@@ -34,15 +34,20 @@ const RECORD: &str = r#"[Event "E"]
 1S Pass 4S AP
 "#;
 
-/// The baseline of every word drawn, from the text operators on the page.
-fn words(flags: &str) -> Vec<(String, f32)> {
+/// Where every word is drawn -- (text, x, baseline) -- from the text
+/// operators, with the multi-column Center headers.
+fn words(flags: &str) -> Vec<(String, f32, f32)> {
+    words_with(&HEADERS, flags)
+}
+
+fn words_with(headers: &[&str], flags: &str) -> Vec<(String, f32, f32)> {
     let pbn = format!(
         "{}\n\n{}",
-        HEADERS.join("\n"),
+        headers.join("\n"),
         RECORD.replace("FLAGS", flags)
     );
     let file = parse_pbn(&pbn).unwrap();
-    let headers: Vec<String> = HEADERS.iter().map(|h| h.to_string()).collect();
+    let headers: Vec<String> = headers.iter().map(|h| h.to_string()).collect();
     let pdf = render_boards(
         &file.boards,
         &headers,
@@ -63,13 +68,16 @@ fn words(flags: &str) -> Vec<(String, f32)> {
         let Ok(content) = lopdf::content::Content::decode(&bytes) else {
             continue;
         };
-        let mut y = 0.0;
+        let (mut x, mut y) = (0.0, 0.0);
         for op in &content.operations {
             match op.operator.as_str() {
-                "Td" => y = op.operands[1].as_float().unwrap_or(0.0),
+                "Td" => {
+                    x = op.operands[0].as_float().unwrap_or(0.0);
+                    y = op.operands[1].as_float().unwrap_or(0.0);
+                }
                 "Tj" => {
                     if let Some(lopdf::Object::String(text, _)) = op.operands.first() {
-                        words.push((String::from_utf8_lossy(text).into_owned(), y));
+                        words.push((String::from_utf8_lossy(text).into_owned(), x, y));
                     }
                 }
                 _ => {}
@@ -79,8 +87,12 @@ fn words(flags: &str) -> Vec<(String, f32)> {
     words
 }
 
-fn baseline(words: &[(String, f32)], word: &str) -> Option<f32> {
-    words.iter().find(|(w, _)| w == word).map(|&(_, y)| y)
+fn baseline(words: &[(String, f32, f32)], word: &str) -> Option<f32> {
+    words.iter().find(|(w, _, _)| w == word).map(|&(_, _, y)| y)
+}
+
+fn left_edge(words: &[(String, f32, f32)], word: &str) -> Option<f32> {
+    words.iter().find(|(w, _, _)| w == word).map(|&(_, x, _)| x)
 }
 
 #[test]
@@ -114,4 +126,36 @@ fn each_block_shows_under_its_own_bcflags_bit() {
     assert_eq!(baseline(&words, "EVENTTEXT"), None);
     assert_eq!(baseline(&words, "DIAGRAMTEXT"), None);
     assert!(baseline(&words, "FINALTEXT").is_some());
+}
+
+/// One board to a page (issue #25): the commentary no longer floats beside
+/// the diagram, but runs full width below the board, as Bridge Composer's does.
+#[test]
+fn one_board_per_page_puts_commentary_below_the_board() {
+    let headers = [
+        "%BCOptions Center STBorder STShade",
+        "%BoardsPerPage 1",
+        r#"%Translate "Board %" "%)""#,
+    ];
+    let words = words_with(&headers, "7f");
+    let y = |word: &str| baseline(&words, word).unwrap_or_else(|| panic!("{word} not drawn"));
+
+    let order = ["EVENTTEXT", "6-1)", "DIAGRAMTEXT", "West", "FINALTEXT"];
+    for pair in order.windows(2) {
+        assert!(
+            y(pair[0]) > y(pair[1]),
+            "{} should be above {}: {:?}",
+            pair[0],
+            pair[1],
+            order.map(y)
+        );
+    }
+    assert_eq!(
+        baseline(&words, "HIDDENTEXT"),
+        None,
+        "between [Board] and [Deal]"
+    );
+    // Full width from the left margin, where the board label starts, rather
+    // than floated into the right half of the page
+    assert_eq!(left_edge(&words, "FINALTEXT"), left_edge(&words, "6-1)"));
 }
