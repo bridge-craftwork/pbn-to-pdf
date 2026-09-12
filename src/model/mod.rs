@@ -20,4 +20,4 @@ pub use hand::{Hand, Holding};
 pub use metadata::{FontSettings, FontSpec, PbnMetadata};
 // The play sequence is bridge-types' as it stands: the renderer reads only
 // `tricks` and each trick's `cards`, and those are the same fields there.
-pub use bridge_types::{PlaySequence, Trick};
+pub use bridge_types::{PlaySequence, SectionEnd, Trick};
