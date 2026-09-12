@@ -67,9 +67,17 @@ impl BCFlags {
 
     /// Show the cards played so far in the card table (bit 11)
     ///
-    /// BridgeComposer draws the trick in a white card table and greys the
-    /// cards in the hands; the exercise sets use it for "what do you play?"
-    /// boards.
+    /// BridgeComposer's own documentation calls this the "View→Slide
+    /// Highlighting" flag, after the GUI feature that sets it, so the name
+    /// here is ours. That it is what drives this rendering was probed against
+    /// 5.118.2, one board under two flag values:
+    ///
+    /// - 0x800 clear: the ordinary compass with its letters, the full hands,
+    ///   and a `Lead:` line.
+    /// - 0x800 set: the trick in a white card table, the played cards greyed
+    ///   in the hands, and neither compass letters nor lead line.
+    ///
+    /// The exercise sets use it for "what do you play?" boards.
     pub fn show_trick(&self) -> bool {
         self.raw & 0x00000800 != 0
     }
