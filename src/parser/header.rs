@@ -373,8 +373,8 @@ pub fn parse_headers(lines: &[&str]) -> PbnMetadata {
                 HeaderDirective::TitleEvent(t) => metadata.title_event = Some(t),
                 HeaderDirective::TitleDate(d) => metadata.title_date = Some(d),
                 HeaderDirective::ShowHcp(v) => metadata.layout.show_hcp = v,
-                HeaderDirective::ShowCardTable(v) => metadata.layout.show_card_table = v,
-                HeaderDirective::ShowBoardLabels(v) => metadata.layout.show_board_labels = v,
+                HeaderDirective::ShowCardTable(v) => metadata.layout.show_card_table = Some(v),
+                HeaderDirective::ShowBoardLabels(v) => metadata.layout.show_board_labels = Some(v),
                 HeaderDirective::TitleSite(s) => metadata.title_site = Some(s),
                 HeaderDirective::TitleSetId(s) => metadata.title_set_id = Some(s),
                 HeaderDirective::PageFooter(cell) => metadata.page_footers.push(cell),
@@ -545,5 +545,16 @@ mod tests {
         let lines = vec!["%Translate \"Board %\" \"%)\""];
         let metadata = parse_headers(&lines);
         assert_eq!(metadata.layout.board_label_format, Some("%)".to_string()));
+    }
+
+    #[test]
+    fn show_card_table_and_board_labels_stay_unset_unless_the_file_says() {
+        let metadata = parse_headers(&["%ShowCardTable 0", "%ShowBoardLabels 2"]);
+        assert_eq!(metadata.layout.show_card_table, Some(false));
+        assert_eq!(metadata.layout.show_board_labels, Some(true));
+
+        let metadata = parse_headers(&["%BCOptions Justify"]);
+        assert_eq!(metadata.layout.show_card_table, None);
+        assert_eq!(metadata.layout.show_board_labels, None);
     }
 }

@@ -5,8 +5,12 @@ pub struct LayoutSettings {
     pub margins: Option<Margins>,
     pub paper_size: Option<PaperSize>,
     pub show_hcp: bool,
-    pub show_card_table: bool,
-    pub show_board_labels: bool,
+    /// `%ShowCardTable`: `Some(false)` for 0, which leaves out the card table.
+    /// `None` when the file doesn't say, which shows it.
+    pub show_card_table: Option<bool>,
+    /// `%ShowBoardLabels`: `Some(false)` for 0, which leaves out the board
+    /// number, dealer and vulnerability. `None` when the file doesn't say.
+    pub show_board_labels: Option<bool>,
     pub justify: bool,
     /// Multi-column layout count (detected from %BoardsPerPage fit,N)
     pub column_count: u8,
