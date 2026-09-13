@@ -713,3 +713,40 @@ fn a_before_deal_block_stands_in_for_absent_event_commentary() {
         "and the between block gives way to it"
     );
 }
+
+/// Commentary typography: a `<b>` heading is set bold, and bullets, en dashes
+/// and the ellipsis reach the page as themselves (#30).
+///
+/// Worth pinning because rasterising cannot check the first of those: poppler
+/// draws non-embedded bold builtins regular, which is what made this look
+/// broken long after it worked.
+#[test]
+fn commentary_keeps_its_bold_bullets_and_dashes() {
+    let pbn = "[Event \"Typography\"]\n[Board \"1\"]\n\
+        [Deal \"W:QT65.J84.KJ3.AQ6 87.A97.A8542.J95 AKJ43.T3.Q97.K72 92.KQ652.T6.T843\"]\n\
+        [BCFlags \"7f\"]\n\
+        {<b>Heading here</b>\n\n\u{2022} A bullet\u{2026}\n\n  \u{2013} An en dash}\n";
+    let file = parse_pbn(pbn).unwrap();
+    let pdf = render_boards(
+        &file.boards,
+        &[],
+        Layout::Analysis,
+        RenderOptions::default(),
+    )
+    .unwrap();
+
+    // The heading takes the bold face
+    assert_eq!(
+        label_font(&pdf, "Heading").as_deref(),
+        Some("Times-Bold"),
+        "a <b> heading is bold"
+    );
+    // The marks themselves survive to the page rather than degrading to `*`
+    // and `-`. Text is written as Windows-1252, so they are single bytes
+    // there rather than their UTF-8 runs.
+    let shown = shown_strings(&pdf);
+    let drawn = |byte: u8| shown.iter().any(|s| s.contains(&byte));
+    assert!(drawn(0x95), "the bullet is a bullet");
+    assert!(drawn(0x96), "the en dash is an en dash");
+    assert!(drawn(0x85), "the ellipsis is an ellipsis");
+}
