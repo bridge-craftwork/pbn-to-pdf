@@ -1,7 +1,8 @@
 use crate::config::Settings;
 use crate::model::card::RankExt;
 use crate::model::{
-    BCFlags, Card, Deal, Direction, Hand, HiddenHands, PlaySequence, Suit, SUITS_DISPLAY_ORDER,
+    BCFlags, Board, Card, Deal, Direction, Hand, HiddenHands, PlaySequence, SectionEnd, Suit,
+    SUITS_DISPLAY_ORDER,
 };
 use printpdf::{BuiltinFont, Color, FontId, Mm, PaintMode, Rgb};
 
@@ -38,6 +39,57 @@ pub struct DiagramDisplayOptions {
     pub trick: Option<[Option<Card>; 4]>,
     /// Every card played so far, which the hands draw greyed
     pub played: Vec<Card>,
+    /// The hand BridgeComposer marks as next to act, and the suit it must
+    /// follow when a trick is part-played (issue #43)
+    pub next_to_act: Option<(Direction, Option<Suit>)>,
+}
+
+/// Whose turn it is, and the suit they must follow if a trick is under way.
+///
+/// `None` when BridgeComposer would draw nothing: the bit is clear, the play is
+/// closed, or a hand is missing from the deal. See `with_next_to_act`.
+fn next_to_act(board: &Board) -> Option<(Direction, Option<Suit>)> {
+    if !board.bc_flags.is_some_and(|f| f.show_trick()) {
+        return None;
+    }
+    if !fully_dealt(&board.deal) {
+        return None;
+    }
+    if let Some(play) = board.play.as_ref() {
+        if play.end == SectionEnd::Terminated {
+            return None;
+        }
+        // The last trick with a card in it, if it is still short of four
+        if let Some(trick) = play
+            .tricks
+            .iter()
+            .rev()
+            .find(|t| t.cards.iter().any(Option::is_some))
+        {
+            let played = trick.cards.iter().filter(|c| c.is_some()).count();
+            if played < 4 {
+                let mut seat = trick.leader;
+                for _ in 0..played {
+                    seat = seat.next();
+                }
+                return Some((seat, trick.lead_suit));
+            }
+        }
+    }
+    // Nothing led yet: the opening leader if the contract is known, else the
+    // dealer, who has the first call. Either may play anything.
+    match board.contract.as_ref() {
+        Some(contract) => Some((contract.declarer.next(), None)),
+        None => board.dealer.map(|dealer| (dealer, None)),
+    }
+}
+
+/// Whether all four hands are on record. A deal short of a hand is a fragment
+/// or a partial layout, and BridgeComposer marks nobody on one.
+fn fully_dealt(deal: &Deal) -> bool {
+    Direction::ALL
+        .iter()
+        .all(|seat| deal.hand(*seat).card_count() == 13)
 }
 
 /// A seat's place in [`DiagramDisplayOptions::trick`]
@@ -87,7 +139,40 @@ impl DiagramDisplayOptions {
             show_suit_symbols,
             trick: None,
             played: Vec::new(),
+            next_to_act: None,
         }
+    }
+
+    /// Mark the hand BridgeComposer boxes in blue as next to act (issue #43).
+    ///
+    /// It boxes whoever has to act next: the dealer before a contract exists,
+    /// the opening leader once one does, and the hand that must follow once a
+    /// suit is led. The first two may play anything, so the whole hand is
+    /// boxed; the third is bound to the led suit, so only that row is.
+    ///
+    /// Four conditions, each isolated against BridgeComposer 5.118.2:
+    ///
+    /// - `BCFlags` 0x800, the same bit that draws the trick in the card table.
+    /// - The `[Play]` section is not closed with `*`, which says no further
+    ///   card will or can be given -- so nobody is next.
+    /// - **Every hand is on record.** Any hand short of thirteen cards stops
+    ///   it, even one that is neither leading nor playing: a deal with North
+    ///   unknown draws nothing though West is the one to act. This is what
+    ///   separates ABS2-1's practice deals, which are fully dealt and boxed,
+    ///   from the ABS3 defence exercises, which are not and are never boxed.
+    /// - The hand itself is not hidden. Hiding a bystander, or the leader, or
+    ///   both, still draws the box; hiding the hand next to act does not.
+    pub fn with_next_to_act(mut self, board: &Board) -> Self {
+        self.next_to_act = next_to_act(board).filter(|(seat, _)| !board.hidden.is_hidden(*seat));
+        self
+    }
+
+    /// The suit to box in this seat's hand, and whether the whole hand goes in
+    /// the box instead of one row.
+    pub fn boxed(&self, seat: Direction) -> Option<Option<Suit>> {
+        self.next_to_act
+            .filter(|(next, _)| *next == seat)
+            .map(|(_, suit)| suit)
     }
 
     /// Add the trick in progress, when `BCFlags` bit 0x800 asks for it:
@@ -130,6 +215,17 @@ impl DiagramDisplayOptions {
         self
     }
 }
+
+/// Gap from a suit's pip to its cards.
+const SUIT_SYMBOL_OFFSET: f32 = 5.0;
+
+/// The blue BridgeComposer marks the hand next to act with: pure blue.
+const NEXT_TO_ACT_COLOR: Rgb = Rgb {
+    r: 0.0,
+    g: 0.0,
+    b: 1.0,
+    icc_profile: None,
+};
 
 /// Renderer for hand diagrams
 pub struct HandDiagramRenderer<'a> {
@@ -321,11 +417,12 @@ impl<'a> HandDiagramRenderer<'a> {
         let north_y = oy.0;
         if !options.hidden.north {
             self.draw_debug_box(layer, north_x, north_y, north_w, hand_h);
-            self.render_hand_cards(
+            self.render_hand_cards_boxed(
                 layer,
                 &deal.north,
                 (Mm(north_x), Mm(north_y)),
                 &options.played,
+                options.boxed(Direction::North),
             );
         }
 
@@ -336,7 +433,13 @@ impl<'a> HandDiagramRenderer<'a> {
         let west_x = ox.0;
         if !options.hidden.west {
             self.draw_debug_box(layer, west_x, row2_y, west_w, hand_h);
-            self.render_hand_cards(layer, &deal.west, (Mm(west_x), Mm(row2_y)), &options.played);
+            self.render_hand_cards_boxed(
+                layer,
+                &deal.west,
+                (Mm(west_x), Mm(row2_y)),
+                &options.played,
+                options.boxed(Direction::West),
+            );
         }
 
         // Compass rose - vertically centered with West/East hands
@@ -359,7 +462,13 @@ impl<'a> HandDiagramRenderer<'a> {
         let east_x = compass_center_x + compass_size / 2.0 + 3.5;
         if !options.hidden.east {
             self.draw_debug_box(layer, east_x, row2_y, east_w, hand_h);
-            self.render_hand_cards(layer, &deal.east, (Mm(east_x), Mm(row2_y)), &options.played);
+            self.render_hand_cards_boxed(
+                layer,
+                &deal.east,
+                (Mm(east_x), Mm(row2_y)),
+                &options.played,
+                options.boxed(Direction::East),
+            );
         }
 
         // Row 3: HCP box (below West) and South hand (next to HCP box)
@@ -375,11 +484,12 @@ impl<'a> HandDiagramRenderer<'a> {
         let south_y = hcp_box_y;
         if !options.hidden.south {
             self.draw_debug_box(layer, north_x, south_y, south_w, hand_h);
-            self.render_hand_cards(
+            self.render_hand_cards_boxed(
                 layer,
                 &deal.south,
                 (Mm(north_x), Mm(south_y)),
                 &options.played,
+                options.boxed(Direction::South),
             );
         }
 
@@ -749,6 +859,19 @@ impl<'a> HandDiagramRenderer<'a> {
         origin: (Mm, Mm),
         played: &[Card],
     ) {
+        self.render_hand_cards_boxed(layer, hand, origin, played, None)
+    }
+
+    /// As `render_hand_cards`, with the blue "next to act" box (issue #43):
+    /// `Some(Some(suit))` boxes that suit's row, `Some(None)` the whole hand.
+    fn render_hand_cards_boxed(
+        &self,
+        layer: &mut LayerBuilder,
+        hand: &Hand,
+        origin: (Mm, Mm),
+        played: &[Card],
+        boxed: Option<Option<Suit>>,
+    ) {
         let (ox, oy) = origin;
         let line_height = self.settings.line_height;
 
@@ -760,11 +883,74 @@ impl<'a> HandDiagramRenderer<'a> {
         // This aligns the top of capital letters with the bounding box top
         let first_baseline = oy.0 - cap_height;
 
+        // The box goes on before the rows, so the cards sit over it
+        if let Some(suit) = boxed {
+            self.draw_next_to_act_box(
+                layer,
+                hand,
+                suit,
+                (Mm(ox.0), Mm(first_baseline)),
+                cap_height,
+            );
+        }
+
         // Render each suit
         for (i, suit) in SUITS_DISPLAY_ORDER.iter().enumerate() {
             let y = first_baseline - (i as f32 * line_height);
             self.render_suit_line(layer, *suit, hand.holding(*suit), (Mm(ox.0), Mm(y)), played);
         }
+    }
+
+    /// The blue rule around the hand next to act: one row when a suit has been
+    /// led and it must be followed, the whole hand when anything may be played.
+    fn draw_next_to_act_box(
+        &self,
+        layer: &mut LayerBuilder,
+        hand: &Hand,
+        suit: Option<Suit>,
+        first_baseline: (Mm, Mm),
+        cap_height: f32,
+    ) {
+        let (ox, oy) = first_baseline;
+        let font_size = self.settings.card_font_size;
+        let measurer = text_metrics::get_times_measurer();
+        let line_height = self.settings.line_height;
+        let pad = cap_height * 0.25;
+
+        let width = |s: Suit| {
+            SUIT_SYMBOL_OFFSET
+                + measurer.measure_width_mm(&holding_text(hand.holding(s)), font_size)
+        };
+        let (rows, top, wide) = match suit {
+            // One row: its own position down the hand, and its own width
+            Some(s) => {
+                let i = SUITS_DISPLAY_ORDER
+                    .iter()
+                    .position(|d| *d == s)
+                    .unwrap_or(0);
+                (1, oy.0 - i as f32 * line_height, width(s))
+            }
+            // The whole hand: every row, and the widest of them
+            None => (
+                SUITS_DISPLAY_ORDER.len(),
+                oy.0,
+                SUITS_DISPLAY_ORDER
+                    .iter()
+                    .map(|s| width(*s))
+                    .fold(0.0_f32, f32::max),
+            ),
+        };
+        let height = cap_height + (rows - 1) as f32 * line_height;
+
+        layer.set_outline_color(Color::Rgb(NEXT_TO_ACT_COLOR));
+        layer.set_outline_thickness(0.4);
+        layer.add_rect(
+            Mm(ox.0 - pad),
+            Mm(top - height + cap_height - pad),
+            Mm(ox.0 - pad + wide + pad),
+            Mm(top + cap_height + pad),
+            PaintMode::Stroke,
+        );
     }
 
     /// Render a single suit line (symbol + cards)
@@ -793,7 +979,13 @@ impl<'a> HandDiagramRenderer<'a> {
         );
 
         // Offset for cards (after suit symbol)
-        self.draw_cards(layer, suit, holding, (Mm(ox.0 + 5.0), oy), played);
+        self.draw_cards(
+            layer,
+            suit,
+            holding,
+            (Mm(ox.0 + SUIT_SYMBOL_OFFSET), oy),
+            played,
+        );
     }
 
     /// Calculate compass box size based on font metrics

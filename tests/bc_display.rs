@@ -551,3 +551,120 @@ fn the_record_keeps_a_suit_symbol_only_when_the_card_does_not_follow() {
     // suit symbols reach the table: the lead's heart and the discard's club.
     assert!(drawn("S") >= 1, "the leader's seat letter");
 }
+
+/// BridgeComposer boxes the hand next to act in blue (#43): the whole hand
+/// while it may play anything, and just the led suit's row once it must
+/// follow.
+///
+/// The board below has South leading ♥K, so West is next and bound to hearts.
+const NEXT: &str = r#"[Board "1"]
+[Dealer "W"]
+[Vulnerable "NS"]
+[Deal "DEAL"]
+[BCFlags "FLAGS"]
+HIDDEN[Play "S"]
+HK
+"#;
+
+/// How many blue rules the board draws. The colour is BridgeComposer's own
+/// pure blue, which nothing else in the output uses.
+fn blue_rules(pbn: &str) -> usize {
+    let file = parse_pbn(pbn).unwrap();
+    let pdf = render_boards(
+        &file.boards,
+        &[],
+        Layout::Analysis,
+        RenderOptions::default(),
+    )
+    .unwrap();
+    let doc = lopdf::Document::load_mem(&pdf).unwrap();
+    let mut blue = 0;
+    for object in doc.objects.values() {
+        let lopdf::Object::Stream(stream) = object else {
+            continue;
+        };
+        let Ok(bytes) = stream.decompressed_content() else {
+            continue;
+        };
+        let Ok(content) = lopdf::content::Content::decode(&bytes) else {
+            continue;
+        };
+        let mut is_blue = false;
+        for op in &content.operations {
+            if op.operator == "RG" {
+                let n: Vec<f32> = op
+                    .operands
+                    .iter()
+                    .filter_map(|o| match o {
+                        lopdf::Object::Real(r) => Some(*r),
+                        lopdf::Object::Integer(i) => Some(*i as f32),
+                        _ => None,
+                    })
+                    .collect();
+                is_blue = n == vec![0.0, 0.0, 1.0];
+            }
+            // add_rect draws a path and strokes it, so the stroke is the box
+            if is_blue && op.operator == "S" {
+                blue += 1;
+            }
+        }
+    }
+    blue
+}
+
+fn next_board(flags: &str, hidden: Option<&str>, deal: &str) -> String {
+    NEXT.replace("FLAGS", flags).replace("DEAL", deal).replace(
+        "HIDDEN",
+        &hidden.map_or(String::new(), |h| format!("[Hidden \"{h}\"]\n")),
+    )
+}
+
+const FULL: &str = "W:QT65.J84.KJ3.AQ6 87.A97.A8542.J95 AKJ43.T3.Q97.K72 92.KQ652.T6.T843";
+
+#[test]
+fn the_hand_next_to_act_is_boxed_under_the_trick_bit() {
+    assert_eq!(blue_rules(&next_board("81d", None, FULL)), 1, "0x800 asks");
+    assert_eq!(
+        blue_rules(&next_board("01d", None, FULL)),
+        0,
+        "without 0x800, nothing"
+    );
+    // `*` says no further card will or can be given, so nobody is next
+    let closed = next_board("81d", None, FULL).replace("HK\n", "HK\n*\n");
+    assert_eq!(blue_rules(&closed), 0, "a closed play section marks nobody");
+}
+
+/// Any hand missing from the deal stops it, even one neither leading nor
+/// playing -- which is what separates ABS2-1's practice deals, fully dealt and
+/// boxed, from the ABS3 defence exercises, which are not and never are.
+#[test]
+fn a_deal_short_of_a_hand_boxes_nobody() {
+    // North is a bystander here: South leads and West is next
+    let north_missing = "W:QT65.J84.KJ3.AQ6 87.A97.A8542.J95 ... 92.KQ652.T6.T843";
+    assert_eq!(blue_rules(&next_board("81d", None, FULL)), 1, "control");
+    assert_eq!(
+        blue_rules(&next_board("81d", None, north_missing)),
+        0,
+        "a bystander missing is enough"
+    );
+}
+
+/// Hiding a bystander, or the leader, still draws it; hiding the hand that has
+/// to act does not.
+#[test]
+fn hiding_the_hand_next_to_act_is_what_suppresses_the_box() {
+    for hidden in ["E", "N", "SN"] {
+        assert_eq!(
+            blue_rules(&next_board("81d", Some(hidden), FULL)),
+            1,
+            "hiding {hidden} leaves West to act"
+        );
+    }
+    for hidden in ["W", "EW"] {
+        assert_eq!(
+            blue_rules(&next_board("81d", Some(hidden), FULL)),
+            0,
+            "{hidden} hides West, who is next"
+        );
+    }
+}
