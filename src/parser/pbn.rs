@@ -269,6 +269,12 @@ fn annotation_parts(annotation: &str) -> Vec<&str> {
                     .find(|c: char| !c.is_ascii_digit())
                     .unwrap_or(rest.len() - 1)
             }
+            // A run of `!` and `?` is one marker, not one per character:
+            // `!?` and `??` are single annotations and BridgeComposer prints
+            // them whole.
+            b'!' | b'?' => rest
+                .find(|c: char| c != '!' && c != '?')
+                .unwrap_or(rest.len()),
             _ => 1,
         };
         let (part, tail) = rest.split_at(take.min(rest.len()));
@@ -282,8 +288,10 @@ fn display_one(part: &str) -> Option<String> {
     if let Some(inner) = part.strip_prefix('=').and_then(|r| r.strip_suffix('=')) {
         return inner.parse::<u8>().ok().map(|n| n.to_string());
     }
+    if !part.is_empty() && part.chars().all(|c| c == '!' || c == '?') {
+        return Some(part.to_string());
+    }
     match part {
-        "!" | "?" => Some(part.to_string()),
         "$1" => Some("!".to_string()),
         "$2" => Some("?".to_string()),
         "$3" => Some("!!".to_string()),
@@ -295,6 +303,32 @@ fn display_one(part: &str) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// `!?` and `??` are one marker each, not two. Splitting them per character
+    /// and keeping the last showed `2S!?` as a bare `?`, where BridgeComposer
+    /// 5.118.2 prints `2 \u{2660}!?` and `4 \u{2660}??` in full.
+    #[test]
+    fn a_run_of_markers_is_one_annotation() {
+        for marker in ["!", "?", "!!", "??", "!?", "?!"] {
+            assert_eq!(
+                display_annotation(marker).as_deref(),
+                Some(marker),
+                "{marker} is a single marker"
+            );
+        }
+    }
+
+    /// A call can still collect more than one annotation -- a marker glued to
+    /// it and a note reference written after it -- and the reference is what
+    /// shows, being the file's last word on that call.
+    #[test]
+    fn a_note_reference_after_a_marker_still_wins() {
+        assert_eq!(display_annotation("?=7=").as_deref(), Some("7"));
+        assert_eq!(display_annotation("=4==5=").as_deref(), Some("5"));
+        // The numeric glyphs keep their conventional text
+        assert_eq!(display_annotation("$1").as_deref(), Some("!"));
+        assert_eq!(display_annotation("$4").as_deref(), Some("??"));
+    }
 
     #[test]
     fn a_block_belongs_to_the_slot_it_stood_in() {
