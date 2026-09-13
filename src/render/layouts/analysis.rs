@@ -372,7 +372,8 @@ impl DocumentRenderer {
         // Diagram height
         if visibility.show_diagram {
             let diagram_options = DiagramDisplayOptions::from_deal(&board.deal, &board.hidden)
-                .with_trick(board.bc_flags, board.play.as_ref());
+                .with_trick(board.bc_flags, board.play.as_ref())
+                .with_next_to_act(board);
 
             // Check for single-card deal - renders just a rank number, not a full diagram
             let is_single_card = board.deal.get_single_visible_card(&board.hidden).is_some();
@@ -1084,7 +1085,8 @@ impl DocumentRenderer {
 
             // Compute display options - all visibility decisions are made here
             let diagram_options = DiagramDisplayOptions::from_deal(&board.deal, &board.hidden)
-                .with_trick(board.bc_flags, board.play.as_ref());
+                .with_trick(board.bc_flags, board.play.as_ref())
+                .with_next_to_act(board);
 
             // Check for single-card deal - render just the rank number instead of a full diagram
             if let Some((_suit, rank)) = board.deal.get_single_visible_card(&board.hidden) {
@@ -1581,7 +1583,8 @@ impl DocumentRenderer {
         if !deal_is_empty {
             // Compute display options - all visibility decisions are made here
             let diagram_options = DiagramDisplayOptions::from_deal(&board.deal, &board.hidden)
-                .with_trick(board.bc_flags, board.play.as_ref());
+                .with_trick(board.bc_flags, board.play.as_ref())
+                .with_next_to_act(board);
 
             let hand_renderer = HandDiagramRenderer::new(
                 diagram_fonts.regular,
