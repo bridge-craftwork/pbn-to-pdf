@@ -162,12 +162,27 @@ impl<'a> ColumnCommentary<'a> {
         let flags = board.bc_flags;
         let blocks = board.commentary.iter().filter(|c| !c.is_blank());
         let allowed = |bit: fn(&BCFlags) -> bool| flags.map(|f| bit(&f)).unwrap_or(true);
+
+        // A block between [Board] and [Deal] takes the event commentary's place
+        // when the board has no block before [Board], and is dropped when it
+        // does (issue #46). Probed against BridgeComposer 5.118.2 in both
+        // modes: a board carrying only a between block draws it above the
+        // board, and a board carrying both draws only the one before [Board].
+        let has_event = board
+            .commentary
+            .iter()
+            .any(|c| !c.is_blank() && c.slot == CommentarySlot::Event);
+        let slot_of = move |block: &CommentaryBlock| match block.slot {
+            CommentarySlot::BeforeDeal if !has_event => CommentarySlot::Event,
+            other => other,
+        };
+
         if !settings.center {
             // Outside Center mode every block BridgeComposer shows goes below
             // the board, but it shows the same ones: each under its own bit,
             // and one between [Board] and [Deal] never
             shown.below = blocks
-                .filter(|block| match block.slot {
+                .filter(|block| match slot_of(block) {
                     CommentarySlot::Event => allowed(BCFlags::show_event_commentary),
                     CommentarySlot::BeforeDeal => false,
                     CommentarySlot::Diagram => allowed(BCFlags::show_diagram_commentary),
@@ -182,7 +197,7 @@ impl<'a> ColumnCommentary<'a> {
             return shown;
         }
         for block in blocks {
-            match block.slot {
+            match slot_of(block) {
                 CommentarySlot::Event if allowed(BCFlags::show_event_commentary) => {
                     shown.above.push(block)
                 }
