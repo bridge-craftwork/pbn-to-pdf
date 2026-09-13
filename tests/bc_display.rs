@@ -668,3 +668,48 @@ fn hiding_the_hand_next_to_act_is_what_suppresses_the_box() {
         );
     }
 }
+
+/// A block between `[Board]` and `[Deal]` takes the event commentary's place
+/// when the board has no block before `[Board]`, and is dropped when it does
+/// (issue #46).
+///
+/// Probed against BridgeComposer 5.118.2: a board carrying only a between
+/// block draws it above the board; a board carrying both draws only the one
+/// before `[Board]`.
+#[test]
+fn a_before_deal_block_stands_in_for_absent_event_commentary() {
+    let board = |before: bool| {
+        let lead = if before { "{EVENTTEXT.}\n" } else { "" };
+        format!(
+            "{lead}[Event \"\"]\n[Board \"1\"]\n{{BETWEENTEXT.}}\n\
+             [Deal \"W:QT65.J84.KJ3.AQ6 87.A97.A8542.J95 AKJ43.T3.Q97.K72 92.KQ652.T6.T843\"]\n\
+             [Dealer \"W\"]\n[Vulnerable \"NS\"]\n[BCFlags \"7f\"]\n"
+        )
+    };
+    let drawn = |pbn: &str, text: &str| {
+        let file = parse_pbn(pbn).unwrap();
+        let pdf = render_boards(
+            &file.boards,
+            &[],
+            Layout::Analysis,
+            RenderOptions::default(),
+        )
+        .unwrap();
+        shown_strings(&pdf)
+            .iter()
+            .any(|s| String::from_utf8_lossy(s).contains(text))
+    };
+
+    // On its own it is drawn, in the event commentary's place
+    assert!(
+        drawn(&board(false), "BETWEENTEXT"),
+        "promoted when nothing precedes it"
+    );
+
+    // With a block before [Board], that one wins and this one goes
+    assert!(drawn(&board(true), "EVENTTEXT"), "the event block is drawn");
+    assert!(
+        !drawn(&board(true), "BETWEENTEXT"),
+        "and the between block gives way to it"
+    );
+}
