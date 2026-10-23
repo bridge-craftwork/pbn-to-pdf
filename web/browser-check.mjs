@@ -54,8 +54,8 @@ check('page loads', (await page.title()).includes('PBN to PDF'))
 // The library, the default lesson and every preview: nothing here is reached
 // without the manifest fetch, the wasm load and pdf.js all working.
 await page.waitForFunction(
-  () => document.querySelectorAll('.gallery img').length >= 6, null, { timeout: 300_000 })
-check('every layout previews as a thumbnail', (await page.locator('.gallery img').count()) === 6)
+  () => document.querySelectorAll('.gallery img').length >= 7, null, { timeout: 300_000 })
+check('every layout previews as a thumbnail', (await page.locator('.gallery img').count()) === 7)
 check('the default lesson preloads', true, await page.textContent('.loaded strong'))
 check('the version reaches the footer', /v\d+\.\d+\.\d+/.test(await page.textContent('footer')))
 
@@ -98,7 +98,7 @@ check('closing the library leaves the page scroll-free',
 
 // Reloading redraws every preview; wait for them before ticking anything.
 await page.waitForFunction(
-  () => document.querySelectorAll('.gallery img').length >= 6, null, { timeout: 300_000 })
+  () => document.querySelectorAll('.gallery img').length >= 7, null, { timeout: 300_000 })
 
 // Two layouts drawn from two different rotations, bundled together.
 const tick = (name) =>
@@ -109,7 +109,8 @@ check('the header counts what is ticked', (await page.textContent('.count')).inc
 
 // A thumbnail on a six-across row is unreadably small; clicking one enlarges it.
 await page.locator('.gallery .shot').first().click()
-await page.waitForSelector('dialog[open] iframe', { timeout: 60_000 })
+// An iframe where the browser has a PDF viewer, pdf.js canvases where it hasn't.
+await page.waitForSelector('dialog[open] .pdfview', { timeout: 60_000 })
 check('a preview enlarges into a modal', true)
 await page.keyboard.press('Escape')
 await page.waitForSelector('dialog[open]', { state: 'detached', timeout: 10_000 })

@@ -2,6 +2,7 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import SourcePicker from '@/components/SourcePicker.vue'
 import LayoutGallery from '@/components/LayoutGallery.vue'
+import PdfView from '@/components/PdfView.vue'
 import {
   DEFAULT_LESSON, VIEW_FOR_LAYOUT, fetchLibrary, fetchSetViews,
 } from '@/lib/baker.js'
@@ -292,7 +293,7 @@ const sizeLabel = computed(() =>
           Download {{ result.count > 1 ? '.zip' : 'PDF' }}
         </a>
       </div>
-      <iframe v-if="result.count === 1" :src="result.url" title="Rendered PDF"></iframe>
+      <PdfView v-if="result.count === 1" :url="result.url" title="Rendered PDF" />
       <p v-else class="muted zipnote">{{ result.name }} — one PDF per layout you ticked.</p>
     </section>
   </main>
@@ -312,7 +313,7 @@ const sizeLabel = computed(() =>
       </div>
     </div>
     <div class="modalbody fill zoombody">
-      <iframe v-if="zoom?.url" :src="zoom.url" title="Layout preview"></iframe>
+      <PdfView v-if="zoom?.url" :url="zoom.url" title="Layout preview" />
       <p v-else class="muted">Rendering…</p>
     </div>
   </dialog>
@@ -391,13 +392,9 @@ fieldset label {
   font-weight: 600; border-radius: var(--radius); padding: 0.45rem 0.9rem;
   white-space: nowrap; margin-left: auto;
 }
-iframe {
-  width: 100%; height: min(72vh, 900px); border: 1px solid var(--line);
-  border-radius: var(--radius); background: #fff;
-}
 .zoombody { padding: 0; }
 .zoombody p { margin: auto; }
-.zoombody iframe { flex: 1; height: auto; border: 0; border-radius: 0; }
+.zoombody .pdfview { flex: 1; min-height: 0; height: auto; border: 0; border-radius: 0; }
 .zoomactions { display: flex; align-items: center; gap: 0.5rem; }
 .zipnote { margin: 0.5rem 0 0; }
 footer { padding: 1.25rem 1rem 2rem; font-size: 0.85rem; }
