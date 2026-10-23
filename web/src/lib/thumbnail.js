@@ -5,10 +5,7 @@
 // canvas; the rest of the document is ignored — `bidding-sheets` in particular
 // pages by auction length and can return several sheets for one preview.
 
-import * as pdfjs from 'pdfjs-dist'
-import workerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
-
-pdfjs.GlobalWorkerOptions.workerSrc = workerUrl
+import { pdfjs } from '@/lib/pdfjs.js'
 
 /// -> a data URL of page 1, no wider or taller than `max`.
 export async function firstPageImage(pdfBytes, max = 320) {
