@@ -149,11 +149,12 @@ onBeforeUnmount(() => {
       <button class="primary" @click="openLibrary">Baker Bridge library…</button>
       <button @click="fileInput.click()">Open a file…</button>
       <button @click="openUrl">From a URL…</button>
+      <!-- No `accept`: iOS filters by system file type, has none for .pbn,
+           and greys out every .pbn file. A non-PBN file fails in the parser. -->
       <input
         ref="fileInput"
         class="hidden-input"
         type="file"
-        accept=".pbn,text/plain"
         @change="takeFile($event.target.files?.[0]); $event.target.value = ''"
       />
     </div>
