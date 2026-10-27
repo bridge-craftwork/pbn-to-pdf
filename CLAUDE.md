@@ -18,19 +18,40 @@ See [README.md](README.md) for CLI usage, options, and examples.
   `web/src/lib/render.js`), changing the public render API, and moving
   printpdf onto a newer azul-core (bridge-viewer patches azul-core for iOS).
   After a renderer change it needs `scripts/build-xcframework.sh` rerun there.
-- **lesson-stage** (`../lesson-stage`) — the iPad presenter. It doesn't use
-  this crate, but is planned to open its PDFs (below).
+- **lesson-stage** (`../lesson-stage`) — the iPad presenter. It doesn't link
+  this crate, but reads the Contract 5 payload its PDFs carry (below).
 
-**Planned: this crate produces Contract 5.** Contract 5 is the
-embedded-attachment and `lesson-block:` link-annotation payload that
-lesson-studio's lesson PDFs carry, so a reader can find each figure on the page
-and get its deal. The contract was approved on 2026-10-27 with a `pbn` profile for this crate
-(payload version 2, a `board` kind, no `body`); it lives at
-`../lesson-stage/docs/contracts/pdf-attachments.md`. Layouts emit
-one link annotation per board as they draw it, and the lopdf pass in
-`render/helpers/compress.rs` attaches the source `.pbn`, provenance, click map
-and deals. Byte reproducibility must survive it, so there's no `renderedAt`.
-Full plan: `../lesson-stage/docs/contract-5-shared-plan.md`. Not built yet.
+**This crate produces Contract 5** (`src/embed.rs`). Contract 5 is the
+embedded-attachment and `lesson-block:` link-annotation payload that lesson PDFs
+carry, so a reader can find each figure on the page and get its deal. Its `pbn`
+profile (payload version 2, a `board` kind, no `body`) was written for this
+crate. The contract is `../lesson-stage/docs/contracts/pdf-attachments.md`, and
+changes to it are proposed there.
+
+- **Layouts report where they drew.** Every renderer has `render_with_regions`.
+  It returns a `BoardRegion` (page, rect in mm) per figure, recorded from the
+  rectangle the layout already computed. `render` drops them. Positions must
+  never be re-derived afterwards: the layout is the print engine. Bidding
+  sheets show each board four times, and each appearance is a figure. The
+  4-up plan uses the quadrant, because the panel's reported size runs past it.
+- **One lopdf pass attaches everything.** `embed::embed` adds the link
+  annotations, the four files, the `/AF` array and the `/EmbeddedFiles` name
+  tree. It runs after `compress_pdf`.
+- **Records are copied, not re-serialised.** `lesson-hands.pbn` comes from
+  bridge-encodings' `PbnDocument::record`, with only `[Board]` renumbered. That
+  needs each rendered board's index in the file, which is why
+  `render_boards_embedded` takes `positions`, and why the CLI and wasm
+  selection keep them.
+- **No clock.** `renderedAt` is optional in the contract, and this crate omits
+  it. `rendering_is_byte_reproducible_across_runs` covers the payload, because
+  the CLI embeds by default.
+- **On by default** in the CLI (`--no-embed`) and in wasm `renderPbn`
+  (`noEmbed`, `sourceName`). The web app turns it off for previews, which are
+  only shown. `render_boards` stays payload-free for library callers that
+  don't want it.
+- `tests/contract5.rs` reads PDFs back as a consumer would. It checks that the
+  links and the map agree, that every rect is on its page, and that boards are
+  numbered 1..n.
 
 ## Build and Test Commands
 

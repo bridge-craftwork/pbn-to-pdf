@@ -11,6 +11,9 @@ A Rust CLI tool that converts PBN (Portable Bridge Notation) files to PDF with B
 - HCP (High Card Points) display for each hand, drawn when the file asks for it with `%BCOptions ShowHCP`
 - Configurable page layout (1, 2, or 4 boards per page)
 - Support for Letter, A4, and Legal paper sizes
+- PDFs that carry their source: the `.pbn` and where each board is on the page
+  are embedded, so a presenter such as lesson-stage can tap a board and get its
+  deal (see [Embedded payload](#embedded-payload))
 
 ## Installation
 
@@ -50,6 +53,7 @@ pbn-to-pdf [OPTIONS] <INPUT>
 | `--no-hcp` | Hide HCP point counts, even when the PBN asks for them |
 | `--no-page-furniture` | Leave out the page header or event headings and the `%PageFooter` lines, for pipelines that add their own |
 | `-b, --boards <RANGE>` | Board range to include (e.g., "1-16" or "5,8,12") |
+| `--no-embed` | Leave out the embedded payload (the source PBN, the click map and the board links) |
 | `-t, --title [TITLE]` | Title for bidding sheets banner (overrides %HRTitleEvent; use with no value to hide) |
 | `--debug-boxes` | Draw debug boxes around layout regions |
 | `-v, --verbose` | Increase verbosity (-v, -vv, -vvv) |
@@ -161,6 +165,10 @@ const pdf = renderPbn(pbnText, "declarers-plan-2up", opts);
 `boards` selects by `[Board]` number, not by position, so a set numbered from 17
 will not respond to `"1"`.
 
+`renderPbn` embeds the payload described below. Set `opts.sourceName` to the
+filename the embedded source should carry (`source.pbn` otherwise), or
+`opts.noEmbed = true` to leave it out, as the web app does for its previews.
+
 For showing what a layout looks like before committing to it, use
 `renderPreview(pbn, layout, options?)`. It renders the opening boards
 positionally — `previewBoardCount(layout)` of them, which is 1 for the 1-up
@@ -184,6 +192,30 @@ it reserves about 11 MiB of memory at load and peaks near 26 MiB rendering an
 
 Output matches the native build: every layout renders pixel-identical PDFs in
 both, verified by rasterizing and comparing.
+
+## Embedded payload
+
+Every PDF carries the PBN profile of **Contract 5**, the attachment format
+lesson-studio's lesson PDFs use. The contract is lesson-stage's
+`docs/contracts/pdf-attachments.md`. A reader needs nothing but the PDF:
+
+| Embedded file | `AFRelationship` | Contents |
+|---|---|---|
+| the input's own name | `Source` | the `.pbn`, byte for byte |
+| `lesson-provenance.json` | `Supplement` | generator, version, layout, `sourceFormat: "pbn"` |
+| `lesson-blocks.json` | `Data` | the click map: each board's page and rectangle (payload version 2) |
+| `lesson-hands.pbn` | `Data` | the rendered boards, copied from the source and renumbered from 1 |
+
+Each board also has a borderless `lesson-block:<index>` link annotation over it,
+with the same rectangle as the click map, so a PDFKit reader can hit-test taps
+without opening the attachments. Bidding sheets show each board on four pages,
+and each appearance is its own figure. The click map's `sourceBoard` keeps the
+board's original number.
+
+The payload adds about 20 KB to a 43-board file and no measurable render time.
+Output stays byte-reproducible: there is no timestamp. `--no-embed` (CLI),
+`noEmbed` (wasm) or `render_boards` (library) leave it out. The library entry
+point that includes it is `render_boards_embedded`.
 
 ## PBN Format Support
 

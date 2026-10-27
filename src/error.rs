@@ -40,6 +40,9 @@ pub enum RenderError {
 
     #[error("Card asset loading error: {0}")]
     CardAsset(String),
+
+    #[error("Could not embed the Contract 5 payload: {0}")]
+    Payload(String),
 }
 
 #[derive(Error, Debug)]
