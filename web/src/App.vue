@@ -159,7 +159,7 @@ async function generate() {
     for (const layout of wanted) {
       const pbn = pbnFor(layout)
       if (!pbn) continue
-      const bytes = await renderBytes(pbn, layout, circles.value)
+      const bytes = await renderBytes(pbn, layout, circles.value, `${source.value.stem}.pbn`)
       files.push({ name: `${source.value.stem} - ${layoutLabel(layout)}.pdf`, bytes })
     }
     if (!files.length) throw new Error('Nothing could be rendered from this selection.')

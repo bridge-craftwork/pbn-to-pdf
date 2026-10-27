@@ -1,6 +1,6 @@
 //! WebAssembly bindings.
 //!
-//! A thin wrapper over [`pbn_to_pdf::render_boards`], which is already a pure
+//! A thin wrapper over [`pbn_to_pdf::render_boards_embedded`], which is already a pure
 //! `&[Board] -> Vec<u8>` function: no filesystem, no clock, no environment.
 //! Fonts and the 52 card SVGs are compiled in, so a browser or Node host needs
 //! nothing but the PBN text.
@@ -16,7 +16,9 @@ use std::str::FromStr;
 use wasm_bindgen::prelude::*;
 
 use pbn_to_pdf::cli::parse_board_range;
-use pbn_to_pdf::{parse_pbn, render_boards, Board, Layout, RenderOptions};
+use pbn_to_pdf::{
+    parse_pbn, render_boards, render_boards_embedded, Board, EmbedSource, Layout, RenderOptions,
+};
 
 /// Route panics to `console.error` with a real message and stack, instead of
 /// the bare `unreachable executed` a wasm trap otherwise surfaces.
@@ -51,6 +53,14 @@ pub struct WasmRenderOptions {
     /// `%PageFooter` lines. Off by default, matching Bridge Composer.
     #[wasm_bindgen(js_name = omitPageFurniture)]
     pub omit_page_furniture: bool,
+    /// Leave out the Contract 5 payload: the source PBN, a click map of where
+    /// each board is, and a `lesson-block:` link over each board. Embedded by
+    /// default; a preview that is only ever shown can skip it.
+    #[wasm_bindgen(js_name = noEmbed)]
+    pub no_embed: bool,
+    /// The filename the embedded source carries. Defaults to `source.pbn`.
+    #[wasm_bindgen(getter_with_clone, js_name = sourceName)]
+    pub source_name: Option<String>,
 }
 
 #[wasm_bindgen(js_class = RenderOptions)]
@@ -78,15 +88,18 @@ impl From<WasmRenderOptions> for RenderOptions {
 
 /// Apply an options `boards` spec, matching what the CLI's `--boards` does:
 /// select by `[Board]` number, and drop boards that carry no number at all.
-fn select_boards(boards: Vec<Board>, spec: Option<&str>) -> Result<Vec<Board>, JsError> {
+fn select_boards(
+    boards: Vec<(usize, Board)>,
+    spec: Option<&str>,
+) -> Result<Vec<(usize, Board)>, JsError> {
     let Some(spec) = spec.map(str::trim).filter(|s| !s.is_empty()) else {
         return Ok(boards);
     };
     let wanted =
         parse_board_range(spec).map_err(|e| JsError::new(&format!("Invalid board range: {e}")))?;
-    let selected: Vec<Board> = boards
+    let selected: Vec<(usize, Board)> = boards
         .into_iter()
-        .filter(|b| b.number.map(|n| wanted.contains(&n)).unwrap_or(false))
+        .filter(|(_, b)| b.number.map(|n| wanted.contains(&n)).unwrap_or(false))
         .collect();
     if selected.is_empty() {
         // Distinct from an empty file: the boards exist, the spec missed them.
@@ -185,7 +198,7 @@ fn render_selected(
     pbn: &str,
     layout: &str,
     options: WasmRenderOptions,
-    choose: impl FnOnce(Vec<Board>) -> Result<Vec<Board>, JsError>,
+    choose: impl FnOnce(Vec<(usize, Board)>) -> Result<Vec<(usize, Board)>, JsError>,
 ) -> Result<Vec<u8>, JsError> {
     let layout = Layout::from_str(layout).map_err(|e| JsError::new(&e))?;
     let pbn_file = parse_pbn(pbn).map_err(|e| JsError::new(&e.to_string()))?;
@@ -196,7 +209,12 @@ fn render_selected(
     if pbn_file.boards.is_empty() {
         return Err(JsError::new("No boards to process"));
     }
-    let boards = choose(pbn_file.boards)?;
+    // Each board keeps its place in the file, so the embedded records can be
+    // copied from the source as written.
+    let (positions, boards): (Vec<usize>, Vec<Board>) =
+        choose(pbn_file.boards.into_iter().enumerate().collect())?
+            .into_iter()
+            .unzip();
 
     // `%` header lines carry the Bridge Composer directives (title, options,
     // margins); render_boards parses them out of the raw comment lines.
@@ -206,6 +224,26 @@ fn render_selected(
         .map(String::from)
         .collect();
 
-    render_boards(&boards, &metadata_comments, layout, options.into())
-        .map_err(|e| JsError::new(&e.to_string()))
+    if options.no_embed {
+        return render_boards(&boards, &metadata_comments, layout, options.into())
+            .map_err(|e| JsError::new(&e.to_string()));
+    }
+    let name = options
+        .source_name
+        .clone()
+        .unwrap_or_else(|| "source.pbn".to_string());
+    let source = EmbedSource {
+        name: &name,
+        text: pbn,
+    };
+    render_boards_embedded(
+        &boards,
+        &positions,
+        &metadata_comments,
+        layout,
+        options.into(),
+        &source,
+    )
+    .map(|rendered| rendered.pdf)
+    .map_err(|e| JsError::new(&e.to_string()))
 }

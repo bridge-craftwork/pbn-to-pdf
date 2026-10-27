@@ -109,6 +109,24 @@ check("renderPbn honours RenderOptions", () => {
     throw new Error("circling produced a byte-identical PDF");
 });
 
+// Contract 5: renderPbn embeds the payload unless told not to. The catalog and
+// annotations are plain objects, so their names are visible in the raw bytes.
+check("renderPbn embeds the Contract 5 payload by default", () => {
+  const opts = new RenderOptions();
+  opts.sourceName = "Stayman.pbn";
+  const text = Buffer.from(renderPbn(pbn, "hand-record", opts)).toString("latin1");
+  for (const needle of ["/EmbeddedFiles", "lesson-blocks.json", "lesson-hands.pbn", "(Stayman.pbn)", "lesson-block:0"])
+    if (!text.includes(needle)) throw new Error(`missing ${needle}`);
+});
+
+check("noEmbed leaves the PDF plain", () => {
+  const opts = new RenderOptions();
+  opts.noEmbed = true;
+  const text = Buffer.from(renderPbn(pbn, "hand-record", opts)).toString("latin1");
+  if (text.includes("/EmbeddedFiles") || text.includes("lesson-block:"))
+    throw new Error("payload present despite noEmbed");
+});
+
 // Board selection: the whole point is that a preview costs a fraction of a
 // full render, so check the size actually drops as well as that it works.
 const full = renderPbn(pbn, "declarers-plan-2up");

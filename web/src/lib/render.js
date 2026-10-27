@@ -26,27 +26,32 @@ export async function layouts() {
   return (await loadEngine()).layouts()
 }
 
-function buildOptions(engine, options) {
-  if (!options || !Object.values(options).some(Boolean)) return undefined
+// `embed` is { sourceName } for a PDF that will be kept, so it carries the
+// Contract 5 payload (the source PBN and where each board is, for lesson-stage
+// and other readers) under that name; null for a preview, which is only shown.
+function buildOptions(engine, options, embed) {
   const opts = new engine.RenderOptions()
-  opts.circleSureWinners = !!options.circleSureWinners
-  opts.circlePromotableWinners = !!options.circlePromotableWinners
-  opts.circleLengthWinners = !!options.circleLengthWinners
+  opts.circleSureWinners = !!options?.circleSureWinners
+  opts.circlePromotableWinners = !!options?.circlePromotableWinners
+  opts.circleLengthWinners = !!options?.circleLengthWinners
+  if (embed) opts.sourceName = embed.sourceName
+  else opts.noEmbed = true
   return opts
 }
 
-/// -> raw PDF bytes for the whole file.
-export async function renderBytes(pbn, layout, options) {
+/// -> raw PDF bytes for the whole file. `sourceName` is the filename the
+/// embedded PBN carries.
+export async function renderBytes(pbn, layout, options, sourceName = 'source.pbn') {
   const engine = await loadEngine()
   // renderPbn is synchronous and CPU-bound: it blocks this thread until the PDF
   // is done. Yield first so a spinner the caller just set actually paints.
   await new Promise((r) => setTimeout(r, 0))
-  return engine.renderPbn(pbn, layout, buildOptions(engine, options))
+  return engine.renderPbn(pbn, layout, buildOptions(engine, options, { sourceName }))
 }
 
 /// -> { blob, url, bytes } for a rendered PDF. Caller revokes the URL.
-export async function render(pbn, layout, options) {
-  const bytes = await renderBytes(pbn, layout, options)
+export async function render(pbn, layout, options, sourceName) {
+  const bytes = await renderBytes(pbn, layout, options, sourceName)
   const blob = new Blob([bytes], { type: 'application/pdf' })
   return { blob, url: URL.createObjectURL(blob), bytes: bytes.length }
 }
@@ -57,7 +62,7 @@ export async function render(pbn, layout, options) {
 export async function renderPreviewBytes(pbn, layout, options) {
   const engine = await loadEngine()
   await new Promise((r) => setTimeout(r, 0))
-  return engine.renderPreview(pbn, layout, buildOptions(engine, options))
+  return engine.renderPreview(pbn, layout, buildOptions(engine, options, null))
 }
 
 /// Layout ids are the CLI's own spellings; this is only for display.
