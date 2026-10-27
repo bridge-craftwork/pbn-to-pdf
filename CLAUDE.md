@@ -24,7 +24,9 @@ See [README.md](README.md) for CLI usage, options, and examples.
 **Planned: this crate produces Contract 5.** Contract 5 is the
 embedded-attachment and `lesson-block:` link-annotation payload that
 lesson-studio's lesson PDFs carry, so a reader can find each figure on the page
-and get its deal. The plan adds a PBN profile (payload version 2). Layouts emit
+and get its deal. The contract was approved on 2026-10-27 with a `pbn` profile for this crate
+(payload version 2, a `board` kind, no `body`); it lives at
+`../lesson-stage/docs/contracts/pdf-attachments.md`. Layouts emit
 one link annotation per board as they draw it, and the lopdf pass in
 `render/helpers/compress.rs` attaches the source `.pbn`, provenance, click map
 and deals. Byte reproducibility must survive it, so there's no `renderedAt`.
