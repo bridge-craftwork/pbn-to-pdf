@@ -8,6 +8,28 @@ This file provides guidance to Claude Code when working with this repository.
 
 See [README.md](README.md) for CLI usage, options, and examples.
 
+## Consumers outside this repo
+
+- **bridge-viewer** (`../bridge-viewer`) — an iPhone/iPad/Mac app that links
+  this crate natively, through a C ABI crate of its own (`rust/` there), and
+  shows the PDFs in PDFKit. It depends on this repo's `main` **unpinned**, so a
+  change here reaches it the same day. Things that break it quietly: renaming
+  or removing a `Layout` (its display names mirror `layoutLabel` in
+  `web/src/lib/render.js`), changing the public render API, and moving
+  printpdf onto a newer azul-core (bridge-viewer patches azul-core for iOS).
+  After a renderer change it needs `scripts/build-xcframework.sh` rerun there.
+- **lesson-stage** (`../lesson-stage`) — the iPad presenter. It doesn't use
+  this crate, but is planned to open its PDFs (below).
+
+**Planned: this crate produces Contract 5.** Contract 5 is the
+embedded-attachment and `lesson-block:` link-annotation payload that
+lesson-studio's lesson PDFs carry, so a reader can find each figure on the page
+and get its deal. The plan adds a PBN profile (payload version 2). Layouts emit
+one link annotation per board as they draw it, and the lopdf pass in
+`render/helpers/compress.rs` attaches the source `.pbn`, provenance, click map
+and deals. Byte reproducibility must survive it, so there's no `renderedAt`.
+Full plan: `../lesson-stage/docs/contract-5-shared-plan.md`. Not built yet.
+
 ## Build and Test Commands
 
 **Use `./dev-build.sh` for local development builds, not bare cargo.** This repo depends on the sibling `bridge-types` and `bridge-encodings` crates as git dependencies, with gitignored `[patch]` overrides in `.cargo/config.toml` redirecting them to the local checkouts in `../bridge-types` and `../bridge-encodings`. Cargo never lets a `[patch]` override an existing `Cargo.lock` pin, so bare `cargo build` silently compiles the GitHub revision instead of your local edits — and if the patch does take effect, it rewrites `Cargo.lock` with a local-path entry that must never be committed (CI has no sibling checkouts). The script keeps a separate local lock (`.cargo/dev.lock`), swaps it in around the cargo call, verifies the patched crate resolved to the local checkout, and leaves the committed `Cargo.lock` untouched. It accepts any cargo subcommand and arguments (`./dev-build.sh test`, `./dev-build.sh run -- file.pbn -o out.pdf`); with no arguments it runs `cargo build`.
