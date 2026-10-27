@@ -4,11 +4,9 @@ use std::fs;
 
 use pbn_to_pdf::cli::{parse_board_range, Args, Layout};
 use pbn_to_pdf::config::Settings;
+use pbn_to_pdf::embed::embed;
 use pbn_to_pdf::parser::parse_pbn;
-use pbn_to_pdf::render::{
-    generate_pdf, BiddingSheetsRenderer, DealerSummaryRenderer, DeclarersPlan1UpRenderer,
-    DeclarersPlan2UpRenderer, DeclarersPlanRenderer, HandRecordRenderer,
-};
+use pbn_to_pdf::{render_with_settings, Board, EmbedSource};
 
 fn main() -> Result<()> {
     let mut args = Args::parse();
@@ -36,23 +34,19 @@ fn main() -> Result<()> {
         args.layout = Some(Layout::default_for(&pbn_file.metadata));
     }
 
-    // Filter boards if range specified
-    let boards = if let Some(ref range_spec) = args.boards {
+    // Filter boards if range specified, keeping each board's place in the
+    // file for the embedded payload
+    let mut selected: Vec<(usize, Board)> = pbn_file.boards.into_iter().enumerate().collect();
+    if let Some(ref range_spec) = args.boards {
         let allowed_boards = parse_board_range(range_spec)
             .map_err(|e| anyhow::anyhow!("Invalid board range: {}", e))?;
-
-        pbn_file
-            .boards
-            .into_iter()
-            .filter(|b| {
-                b.number
-                    .map(|n| allowed_boards.contains(&n))
-                    .unwrap_or(false)
-            })
-            .collect()
-    } else {
-        pbn_file.boards
-    };
+        selected.retain(|(_, b)| {
+            b.number
+                .map(|n| allowed_boards.contains(&n))
+                .unwrap_or(false)
+        });
+    }
+    let (positions, boards): (Vec<usize>, Vec<Board>) = selected.into_iter().unzip();
 
     if boards.is_empty() {
         anyhow::bail!("No boards to process");
@@ -62,47 +56,28 @@ fn main() -> Result<()> {
 
     // Build settings from CLI args and PBN metadata
     let settings = Settings::from_args(&args).with_metadata(&pbn_file.metadata);
+    let layout = settings.layout;
 
     // Generate PDF
     let output_path = args.output_path();
 
-    let pdf_data = match settings.layout {
-        Layout::Analysis => {
-            generate_pdf(&boards, &settings).with_context(|| "Failed to generate PDF")?
-        }
-        Layout::BiddingSheets => {
-            let renderer = BiddingSheetsRenderer::new(settings);
-            renderer
-                .render(&boards)
-                .with_context(|| "Failed to generate bidding sheets PDF")?
-        }
-        Layout::DeclarersPlan1up => {
-            let renderer = DeclarersPlan1UpRenderer::new(settings);
-            renderer
-                .render(&boards)
-                .with_context(|| "Failed to generate declarer's plan 1-up PDF")?
-        }
-        Layout::DeclarersPlan2up => {
-            let renderer = DeclarersPlan2UpRenderer::new(settings);
-            renderer
-                .render(&boards)
-                .with_context(|| "Failed to generate declarer's plan 2-up PDF")?
-        }
-        Layout::DeclarersPlan => {
-            let renderer = DeclarersPlanRenderer::new(settings);
-            renderer
-                .render(&boards)
-                .with_context(|| "Failed to generate declarer's plan PDF")?
-        }
-        Layout::DealerSummary => {
-            let renderer = DealerSummaryRenderer::new(settings);
-            renderer
-                .render(&boards)
-                .with_context(|| "Failed to generate dealer summary PDF")?
-        }
-        Layout::HandRecord => HandRecordRenderer::new(settings)
-            .render(&boards)
-            .with_context(|| "Failed to generate hand record PDF")?,
+    let (pdf_data, regions) = render_with_settings(&boards, &settings)
+        .with_context(|| format!("Failed to generate {} PDF", layout.as_str()))?;
+    let pdf_data = if args.no_embed {
+        pdf_data
+    } else {
+        let name = args
+            .input
+            .file_name()
+            .map(|n| n.to_string_lossy().into_owned())
+            .unwrap_or_else(|| "source.pbn".to_string());
+        let source = EmbedSource {
+            name: &name,
+            text: &pbn_content,
+        };
+        embed(pdf_data, &regions, &boards, &positions, &source, layout)
+            .with_context(|| "Failed to embed the PDF's payload")?
+            .pdf
     };
 
     // Write output

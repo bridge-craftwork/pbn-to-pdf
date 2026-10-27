@@ -22,6 +22,7 @@ use crate::render::helpers::compress::compress_pdf;
 use crate::render::helpers::document::new_document;
 use crate::render::helpers::fonts::FontManager;
 use crate::render::helpers::layer::LayerBuilder;
+use crate::render::helpers::regions::{BoardRegion, Regions};
 use crate::render::helpers::text_metrics::BuiltinFontMeasurer;
 
 const COLS: usize = 4;
@@ -69,9 +70,18 @@ impl HandRecordRenderer {
     }
 
     pub fn render(&self, boards: &[Board]) -> Result<Vec<u8>, RenderError> {
+        self.render_with_regions(boards).map(|(pdf, _)| pdf)
+    }
+
+    /// Render, and report where each board was drawn (one region per cell)
+    pub fn render_with_regions(
+        &self,
+        boards: &[Board],
+    ) -> Result<(Vec<u8>, Vec<BoardRegion>), RenderError> {
         let title = self.title(boards).unwrap_or("Hand Record").to_string();
         let mut doc = new_document(&title);
         let fonts = FontManager::new(&mut doc)?;
+        let mut regions = Regions::new();
 
         let pages: Vec<PdfPage> = boards
             .chunks(BOARDS_PER_PAGE)
@@ -83,7 +93,10 @@ impl HandRecordRenderer {
                     self.draw_title_block(&mut layer, &fonts, &title, page + 1);
                 }
                 for (i, board) in chunk.iter().enumerate() {
-                    self.draw_board(&mut layer, &fonts, board, self.cell(i + TITLE_CELLS));
+                    let cell = self.cell(i + TITLE_CELLS);
+                    self.draw_board(&mut layer, &fonts, board, cell);
+                    let index = page * BOARDS_PER_PAGE + i;
+                    regions.push(index, page, cell.x, cell.top, cell.width, cell.height);
                 }
                 PdfPage::new(
                     Mm(self.settings.page_width),
@@ -96,7 +109,10 @@ impl HandRecordRenderer {
         doc.with_pages(pages);
         let mut warnings = Vec::new();
         let bytes = doc.save(&PdfSaveOptions::default(), &mut warnings);
-        Ok(compress_pdf(bytes.clone()).unwrap_or(bytes))
+        Ok((
+            compress_pdf(bytes.clone()).unwrap_or(bytes),
+            regions.into_vec(),
+        ))
     }
 
     /// The title: `%HRTitleEvent`, else the first board's event

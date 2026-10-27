@@ -68,6 +68,11 @@ pub struct Args {
     #[arg(long)]
     pub no_page_furniture: bool,
 
+    /// Don't embed the Contract 5 payload (the source PBN, a click map of
+    /// where each board is, and a link over each board) in the PDF
+    #[arg(long)]
+    pub no_embed: bool,
+
     /// Board range to include (e.g., "1-16" or "5,8,12")
     #[arg(short = 'b', long)]
     pub boards: Option<String>,
@@ -449,6 +454,7 @@ mod tests {
             hcp: false,
             no_hcp: false,
             no_page_furniture: false,
+            no_embed: false,
             boards: None,
             margins: None,
             debug_boxes: false,
@@ -490,6 +496,7 @@ mod tests {
             hcp,
             no_hcp,
             no_page_furniture: false,
+            no_embed: false,
             boards: None,
             margins: None,
             debug_boxes: false,

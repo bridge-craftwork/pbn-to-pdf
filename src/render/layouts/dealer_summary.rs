@@ -17,6 +17,7 @@ use crate::render::helpers::compress::compress_pdf;
 use crate::render::helpers::document::new_document;
 use crate::render::helpers::fonts::FontManager;
 use crate::render::helpers::layer::{save_options, LayerBuilder};
+use crate::render::helpers::regions::{BoardRegion, Regions};
 use crate::render::helpers::text_metrics::get_helvetica_measurer;
 
 /// Border color for cells
@@ -65,6 +66,14 @@ impl DealerSummaryRenderer {
 
     /// Generate a PDF with dealer summary (6 boards per page)
     pub fn render(&self, boards: &[Board]) -> Result<Vec<u8>, RenderError> {
+        self.render_with_regions(boards).map(|(pdf, _)| pdf)
+    }
+
+    /// Render, and report where each board was drawn (its box)
+    pub fn render_with_regions(
+        &self,
+        boards: &[Board],
+    ) -> Result<(Vec<u8>, Vec<BoardRegion>), RenderError> {
         let title = boards
             .first()
             .and_then(|b| b.event.as_ref())
@@ -77,11 +86,25 @@ impl DealerSummaryRenderer {
         let fonts = FontManager::new(&mut doc)?;
 
         let mut pages = Vec::new();
+        let mut regions = Regions::new();
 
         // Process boards in groups of 6
-        for chunk in boards.chunks(BOARDS_PER_PAGE) {
+        for (page, chunk) in boards.chunks(BOARDS_PER_PAGE).enumerate() {
             let mut layer = LayerBuilder::new();
-            self.render_page(&mut layer, chunk, &fonts);
+            for (i, (x, top)) in self
+                .render_page(&mut layer, chunk, &fonts)
+                .into_iter()
+                .enumerate()
+            {
+                regions.push(
+                    page * BOARDS_PER_PAGE + i,
+                    page,
+                    x,
+                    top,
+                    BOX_WIDTH,
+                    BOX_HEIGHT,
+                );
+            }
             pages.push(PdfPage::new(
                 Mm(self.settings.page_width),
                 Mm(self.settings.page_height),
@@ -96,11 +119,17 @@ impl DealerSummaryRenderer {
 
         // Compress PDF streams to reduce file size
         let compressed = compress_pdf(bytes.clone()).unwrap_or(bytes);
-        Ok(compressed)
+        Ok((compressed, regions.into_vec()))
     }
 
-    /// Render a single page with up to 6 boards
-    fn render_page(&self, layer: &mut LayerBuilder, boards: &[Board], fonts: &FontManager) {
+    /// Render a single page with up to 6 boards, returning each box's top-left
+    /// corner in board order
+    fn render_page(
+        &self,
+        layer: &mut LayerBuilder,
+        boards: &[Board],
+        fonts: &FontManager,
+    ) -> Vec<(f32, f32)> {
         let colors = SuitColors::new(self.settings.black_color, self.settings.red_color);
 
         // Page layout
@@ -114,6 +143,8 @@ impl DealerSummaryRenderer {
         // Center the grid on the page
         let grid_start_x = (page_width - grid_width) / 2.0;
         let grid_start_y = page_height - (page_height - grid_height) / 2.0;
+
+        let mut corners = Vec::new();
 
         // Render each board
         for (i, board) in boards.iter().enumerate() {
@@ -130,6 +161,7 @@ impl DealerSummaryRenderer {
 
             // Draw box border
             self.draw_cell_border(layer, box_x, box_y, BOX_WIDTH, BOX_HEIGHT);
+            corners.push((box_x, box_y));
 
             // Render board content (text starts at offset from top-left)
             self.render_board_cell(
@@ -141,6 +173,7 @@ impl DealerSummaryRenderer {
                 box_y - TEXT_OFFSET_Y,
             );
         }
+        corners
     }
 
     /// Draw border around a cell

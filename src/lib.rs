@@ -1,5 +1,6 @@
 pub mod cli;
 pub mod config;
+pub mod embed;
 pub mod error;
 pub mod model;
 pub mod parser;
@@ -7,12 +8,15 @@ pub mod render;
 
 pub use cli::Layout;
 pub use config::Settings;
+pub use embed::{EmbedSource, Rendered};
 pub use error::{PbnError, RenderError};
 pub use model::Board;
 pub use parser::{parse_pbn, PbnFile};
 pub use render::generate_pdf;
 
 use parser::header::parse_headers;
+use render::helpers::BoardRegion;
+use render::layouts::analysis::DocumentRenderer;
 use render::{
     BiddingSheetsRenderer, DealerSummaryRenderer, DeclarersPlan1UpRenderer,
     DeclarersPlan2UpRenderer, DeclarersPlanRenderer, HandRecordRenderer,
@@ -88,6 +92,36 @@ pub fn render_boards(
     layout: Layout,
     options: RenderOptions,
 ) -> Result<Vec<u8>, RenderError> {
+    render_with_settings(boards, &settings_for(metadata_comments, layout, options))
+        .map(|(pdf, _)| pdf)
+}
+
+/// Render boards picked from a PBN file, with Contract 5's payload attached.
+///
+/// As [`render_boards`], plus the PBN profile of Contract 5 (contract in
+/// lesson-stage, `docs/contracts/pdf-attachments.md`): the source file and the
+/// rendered boards embedded in the PDF, a click map giving each board's page
+/// and rectangle, and a `lesson-block:` link over each board. A presenter such
+/// as lesson-stage can then tap a board and get its deal from the PDF alone.
+///
+/// `positions[i]` is the index of `boards[i]` in `parse_pbn(source.text)`, so
+/// each embedded record is copied from the file as written.
+pub fn render_boards_embedded(
+    boards: &[Board],
+    positions: &[usize],
+    metadata_comments: &[String],
+    layout: Layout,
+    options: RenderOptions,
+    source: &EmbedSource,
+) -> Result<Rendered, RenderError> {
+    let settings = settings_for(metadata_comments, layout, options);
+    let (pdf, regions) = render_with_settings(boards, &settings)?;
+    embed::embed(pdf, &regions, boards, positions, source, layout)
+}
+
+/// Settings with layout-appropriate defaults, the file's metadata, and the
+/// caller's options.
+fn settings_for(metadata_comments: &[String], layout: Layout, options: RenderOptions) -> Settings {
     // Parse metadata from raw comment lines
     let comment_refs: Vec<&str> = metadata_comments.iter().map(|s| s.as_str()).collect();
     let metadata = parse_headers(&comment_refs);
@@ -99,30 +133,28 @@ pub fn render_boards(
     settings.circle_length_winners = options.circle_length_winners;
     settings.section_commentary = options.section_commentary;
     settings.page_furniture = !options.omit_page_furniture;
+    settings
+}
 
-    // Route to the appropriate renderer based on layout
-    match layout {
-        Layout::Analysis => generate_pdf(boards, &settings),
-        Layout::BiddingSheets => {
-            let renderer = BiddingSheetsRenderer::new(settings);
-            renderer.render(boards)
-        }
+/// Render with fully-built settings, in `settings.layout`, and report where each
+/// board was drawn. The CLI comes in here, since its settings come from its
+/// arguments rather than [`RenderOptions`].
+pub fn render_with_settings(
+    boards: &[Board],
+    settings: &Settings,
+) -> Result<(Vec<u8>, Vec<BoardRegion>), RenderError> {
+    let settings = settings.clone();
+    match settings.layout {
+        Layout::Analysis => DocumentRenderer::new(settings).render_with_regions(boards),
+        Layout::BiddingSheets => BiddingSheetsRenderer::new(settings).render_with_regions(boards),
         Layout::DeclarersPlan1up => {
-            let renderer = DeclarersPlan1UpRenderer::new(settings);
-            renderer.render(boards)
+            DeclarersPlan1UpRenderer::new(settings).render_with_regions(boards)
         }
         Layout::DeclarersPlan2up => {
-            let renderer = DeclarersPlan2UpRenderer::new(settings);
-            renderer.render(boards)
+            DeclarersPlan2UpRenderer::new(settings).render_with_regions(boards)
         }
-        Layout::DeclarersPlan => {
-            let renderer = DeclarersPlanRenderer::new(settings);
-            renderer.render(boards)
-        }
-        Layout::DealerSummary => {
-            let renderer = DealerSummaryRenderer::new(settings);
-            renderer.render(boards)
-        }
-        Layout::HandRecord => HandRecordRenderer::new(settings).render(boards),
+        Layout::DeclarersPlan => DeclarersPlanRenderer::new(settings).render_with_regions(boards),
+        Layout::DealerSummary => DealerSummaryRenderer::new(settings).render_with_regions(boards),
+        Layout::HandRecord => HandRecordRenderer::new(settings).render_with_regions(boards),
     }
 }

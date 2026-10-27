@@ -21,6 +21,7 @@ use crate::render::helpers::compress::compress_pdf;
 use crate::render::helpers::document::new_document;
 use crate::render::helpers::fonts::FontManager;
 use crate::render::helpers::layer::{save_options, LayerBuilder};
+use crate::render::helpers::regions::{BoardRegion, Regions};
 
 /// Separator line thickness
 const SEPARATOR_THICKNESS: f32 = 2.0;
@@ -236,14 +237,18 @@ fn draw_vertical_separator(
     );
 }
 
-/// Generate the final PDF bytes from a document
-fn finalize_pdf(doc: PdfDocument, pages: Vec<PdfPage>) -> Result<Vec<u8>, RenderError> {
+/// Generate the final PDF bytes from a document, alongside where its boards are
+fn finalize_pdf(
+    doc: PdfDocument,
+    pages: Vec<PdfPage>,
+    regions: Regions,
+) -> Result<(Vec<u8>, Vec<BoardRegion>), RenderError> {
     let mut doc = doc;
     doc.with_pages(pages);
     let mut warnings = Vec::new();
     let bytes = doc.save(&save_options(), &mut warnings);
     let compressed = compress_pdf(bytes.clone()).unwrap_or(bytes);
-    Ok(compressed)
+    Ok((compressed, regions.into_vec()))
 }
 
 // ---------------------------------------------------------------------------
@@ -264,6 +269,14 @@ impl DeclarersPlan1UpRenderer {
     }
 
     pub fn render(&self, boards: &[Board]) -> Result<Vec<u8>, RenderError> {
+        self.render_with_regions(boards).map(|(pdf, _)| pdf)
+    }
+
+    /// Render, and report where each board was drawn (its panel)
+    pub fn render_with_regions(
+        &self,
+        boards: &[Board],
+    ) -> Result<(Vec<u8>, Vec<BoardRegion>), RenderError> {
         let title = boards
             .first()
             .and_then(|b| b.event.as_ref())
@@ -276,8 +289,9 @@ impl DeclarersPlan1UpRenderer {
             .map_err(|e| RenderError::CardAsset(e.to_string()))?;
 
         let mut pages = Vec::new();
+        let mut regions = Regions::new();
 
-        for board in boards {
+        for (index, board) in boards.iter().enumerate() {
             let prep = prepare_board(board);
             let renderer = renderer_for_board(
                 &card_assets,
@@ -304,6 +318,7 @@ impl DeclarersPlan1UpRenderer {
                 - (content_height - panel_h) / 2.0;
 
             render_prepared(&renderer, &mut layer, &prep, (Mm(origin_x), Mm(origin_y)));
+            regions.push(index, index, origin_x, origin_y, panel_w, panel_h);
 
             pages.push(PdfPage::new(
                 Mm(self.settings.page_width),
@@ -312,7 +327,7 @@ impl DeclarersPlan1UpRenderer {
             ));
         }
 
-        finalize_pdf(doc, pages)
+        finalize_pdf(doc, pages, regions)
     }
 }
 
@@ -348,6 +363,14 @@ impl DeclarersPlan2UpRenderer {
     }
 
     pub fn render(&self, boards: &[Board]) -> Result<Vec<u8>, RenderError> {
+        self.render_with_regions(boards).map(|(pdf, _)| pdf)
+    }
+
+    /// Render, and report where each board was drawn (its panel)
+    pub fn render_with_regions(
+        &self,
+        boards: &[Board],
+    ) -> Result<(Vec<u8>, Vec<BoardRegion>), RenderError> {
         let title = boards
             .first()
             .and_then(|b| b.event.as_ref())
@@ -379,8 +402,9 @@ impl DeclarersPlan2UpRenderer {
         let right_slot_cx = center_x + half_width / 2.0 + center_inset / 2.0;
 
         let mut pages = Vec::new();
+        let mut regions = Regions::new();
 
-        for chunk in boards.chunks(2) {
+        for (page, chunk) in boards.chunks(2).enumerate() {
             let mut layer = LayerBuilder::new();
 
             // Draw vertical separator between the side-by-side panels
@@ -415,6 +439,7 @@ impl DeclarersPlan2UpRenderer {
                 let panel_oy = dest_cy + panel_h.min(slot_h) / 2.0;
 
                 render_prepared(&renderer, &mut layer, &prep, (Mm(panel_ox), Mm(panel_oy)));
+                regions.push(page * 2 + i, page, panel_ox, panel_oy, panel_w, panel_h);
             }
 
             pages.push(PdfPage::new(
@@ -424,7 +449,7 @@ impl DeclarersPlan2UpRenderer {
             ));
         }
 
-        finalize_pdf(doc, pages)
+        finalize_pdf(doc, pages, regions)
     }
 }
 
@@ -447,6 +472,14 @@ impl DeclarersPlanRenderer {
 
     /// Generate a PDF with declarer's plan practice sheets (4 per page)
     pub fn render(&self, boards: &[Board]) -> Result<Vec<u8>, RenderError> {
+        self.render_with_regions(boards).map(|(pdf, _)| pdf)
+    }
+
+    /// Render, and report where each board was drawn (its panel)
+    pub fn render_with_regions(
+        &self,
+        boards: &[Board],
+    ) -> Result<(Vec<u8>, Vec<BoardRegion>), RenderError> {
         let title = boards
             .first()
             .and_then(|b| b.event.as_ref())
@@ -459,10 +492,14 @@ impl DeclarersPlanRenderer {
             .map_err(|e| RenderError::CardAsset(e.to_string()))?;
 
         let mut pages = Vec::new();
+        let mut regions = Regions::new();
 
-        for chunk in boards.chunks(4) {
+        for (page, chunk) in boards.chunks(4).enumerate() {
             let mut layer = LayerBuilder::new();
-            self.render_page(&mut layer, chunk, &fonts, &card_assets);
+            let panels = self.render_page(&mut layer, chunk, &fonts, &card_assets);
+            for (i, (x, top, width, height)) in panels.into_iter().enumerate() {
+                regions.push(page * 4 + i, page, x, top, width, height);
+            }
             pages.push(PdfPage::new(
                 Mm(self.settings.page_width),
                 Mm(self.settings.page_height),
@@ -470,17 +507,20 @@ impl DeclarersPlanRenderer {
             ));
         }
 
-        finalize_pdf(doc, pages)
+        finalize_pdf(doc, pages, regions)
     }
 
-    /// Render a single page with up to 4 deals
+    /// Render a single page with up to 4 deals, returning each quadrant's
+    /// top-left corner and size in board order. The quadrant, not the panel, is
+    /// the board's figure: the panel's reported size runs past the quadrant it
+    /// is drawn in, and the bottom row's would leave the page.
     fn render_page(
         &self,
         layer: &mut LayerBuilder,
         boards: &[Board],
         fonts: &FontManager,
         card_assets: &CardAssets,
-    ) {
+    ) -> Vec<(f32, f32, f32, f32)> {
         let margin_left = self.settings.margin_left;
         let margin_right = self.settings.margin_right;
         let margin_top = self.settings.margin_top;
@@ -508,6 +548,7 @@ impl DeclarersPlanRenderer {
             (center_x + PANEL_PADDING, center_y),                    // Bottom-right
         ];
 
+        let mut panels = Vec::new();
         for (i, board) in boards.iter().enumerate() {
             if i >= 4 {
                 break;
@@ -524,7 +565,10 @@ impl DeclarersPlanRenderer {
                 &prep.declarer_hand,
             );
             render_prepared(&renderer, layer, &prep, (Mm(x), Mm(y)));
+            let left = if i % 2 == 0 { margin_left } else { center_x };
+            panels.push((left, y, half_width, half_height));
         }
+        panels
     }
 
     /// Draw horizontal and vertical separator lines between quadrants
