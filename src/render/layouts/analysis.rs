@@ -17,6 +17,7 @@ use crate::render::helpers::compress::compress_pdf;
 use crate::render::helpers::document::new_document;
 use crate::render::helpers::fonts::FontManager;
 use crate::render::helpers::layer::{save_options, LayerBuilder};
+use crate::render::helpers::regions::{BoardRegion, Regions};
 use crate::render::helpers::text_metrics::{self, get_times_measurer};
 
 /// Light gray color for debug boxes (component level)
@@ -659,6 +660,15 @@ impl DocumentRenderer {
 
     /// Generate a PDF from a list of boards
     pub fn render(&self, boards: &[Board]) -> Result<Vec<u8>, RenderError> {
+        self.render_with_regions(boards).map(|(pdf, _)| pdf)
+    }
+
+    /// Render, and report where each board was drawn: its slot in a column,
+    /// or the page's content area when each board has a page to itself
+    pub fn render_with_regions(
+        &self,
+        boards: &[Board],
+    ) -> Result<(Vec<u8>, Vec<BoardRegion>), RenderError> {
         let title = boards
             .first()
             .and_then(|b| b.event.as_ref())
@@ -676,14 +686,15 @@ impl DocumentRenderer {
             .page_furniture
             .then(|| PageFurniture::new(&self.settings, &fonts));
 
+        let mut regions = Regions::new();
         let layers = if self.settings.column_count >= 2 {
             // Multi-column layout: fit multiple boards per page
-            self.render_multi_column(boards, &fonts, furniture.as_ref())
+            self.render_multi_column(boards, &fonts, furniture.as_ref(), &mut regions)
         } else {
             // Single board per page (original behavior)
             let mut layers = Vec::new();
             let in_force = running_events(boards);
-            for (board, running) in boards.iter().zip(in_force) {
+            for (index, (board, running)) in boards.iter().zip(in_force).enumerate() {
                 let mut layer = LayerBuilder::new();
                 let mut top = self.settings.page_height - self.settings.margin_top;
                 if let Some(furniture) = &furniture {
@@ -704,6 +715,14 @@ impl DocumentRenderer {
                     }
                 }
                 self.render_board(&mut layer, board, &fonts, self.settings.margin_left, top);
+                regions.push(
+                    index,
+                    layers.len(),
+                    self.settings.margin_left,
+                    top,
+                    self.settings.content_width(),
+                    top - self.settings.margin_bottom,
+                );
                 layers.push(layer);
             }
             layers
@@ -734,15 +753,17 @@ impl DocumentRenderer {
 
         // Compress PDF streams to reduce file size
         let compressed = compress_pdf(bytes.clone()).unwrap_or(bytes);
-        Ok(compressed)
+        Ok((compressed, regions.into_vec()))
     }
 
-    /// Render boards in multi-column layout with multiple boards per page
+    /// Render boards in multi-column layout with multiple boards per page,
+    /// recording each board's slot in `regions`
     fn render_multi_column(
         &self,
         boards: &[Board],
         fonts: &FontManager,
         furniture: Option<&PageFurniture>,
+        regions: &mut Regions,
     ) -> Vec<LayerBuilder> {
         let mut pages = Vec::new();
 
@@ -895,7 +916,7 @@ impl DocumentRenderer {
                     }
 
                     // Board fits - consume and render it
-                    let board = board_iter.next().unwrap().1;
+                    let (index, board) = board_iter.next().unwrap();
 
                     // Draw horizontal separator if not at top
                     if column_board_count[col_idx] > 0 {
@@ -912,6 +933,15 @@ impl DocumentRenderer {
                         col_x,
                         column_y[col_idx],
                         usable_column_width,
+                    );
+
+                    regions.push(
+                        index,
+                        pages.len(),
+                        col_x,
+                        column_y[col_idx],
+                        usable_column_width,
+                        rendered_height,
                     );
 
                     // Draw debug box around the whole board

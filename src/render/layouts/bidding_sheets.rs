@@ -21,6 +21,7 @@ use crate::render::helpers::compress::compress_pdf;
 use crate::render::helpers::document::new_document;
 use crate::render::helpers::fonts::FontManager;
 use crate::render::helpers::layer::{save_options, LayerBuilder};
+use crate::render::helpers::regions::{BoardRegion, Regions};
 use crate::render::helpers::text_metrics::{
     get_helvetica_bold_measurer, get_helvetica_measurer, get_times_measurer, TextMeasure,
 };
@@ -257,6 +258,16 @@ impl BiddingSheetsRenderer {
 
     /// Generate a PDF with bidding practice sheets
     pub fn render(&self, boards: &[Board]) -> Result<Vec<u8>, RenderError> {
+        self.render_with_regions(boards).map(|(pdf, _)| pdf)
+    }
+
+    /// Render, and report where each board was drawn. Every board appears on
+    /// four pages -- both practice pages and both answers pages -- and each
+    /// appearance is its own region: its row, across the full content width.
+    pub fn render_with_regions(
+        &self,
+        boards: &[Board],
+    ) -> Result<(Vec<u8>, Vec<BoardRegion>), RenderError> {
         let title = boards
             .first()
             .and_then(|b| b.event.as_ref())
@@ -276,42 +287,33 @@ impl BiddingSheetsRenderer {
         // Group boards into sets that fit on a page using actual measured heights
         let board_sets = self.group_boards_with_heights(boards, &board_heights);
 
+        let mut regions = Regions::new();
+        let left = self.settings.margin_left;
+        let width = self.settings.content_width();
+        let mut first = 0;
+
         for board_set in board_sets {
-            // North practice page
-            let mut layer = LayerBuilder::new();
-            self.render_practice_page(&mut layer, board_set, Direction::North, &fonts);
-            pages.push(PdfPage::new(
-                Mm(self.settings.page_width),
-                Mm(self.settings.page_height),
-                layer.into_ops(),
-            ));
-
-            // Answers page (after North)
-            let mut layer = LayerBuilder::new();
-            self.render_answers_page(&mut layer, board_set, &fonts);
-            pages.push(PdfPage::new(
-                Mm(self.settings.page_width),
-                Mm(self.settings.page_height),
-                layer.into_ops(),
-            ));
-
-            // South practice page
-            let mut layer = LayerBuilder::new();
-            self.render_practice_page(&mut layer, board_set, Direction::South, &fonts);
-            pages.push(PdfPage::new(
-                Mm(self.settings.page_width),
-                Mm(self.settings.page_height),
-                layer.into_ops(),
-            ));
-
-            // Answers page (after South, for duplex printing)
-            let mut layer = LayerBuilder::new();
-            self.render_answers_page(&mut layer, board_set, &fonts);
-            pages.push(PdfPage::new(
-                Mm(self.settings.page_width),
-                Mm(self.settings.page_height),
-                layer.into_ops(),
-            ));
+            // North practice, answers, South practice, answers (the second
+            // answers page backs the South page for duplex printing)
+            let page_kinds = [Some(Direction::North), None, Some(Direction::South), None];
+            for player in page_kinds {
+                let mut layer = LayerBuilder::new();
+                let rows = match player {
+                    Some(player) => {
+                        self.render_practice_page(&mut layer, board_set, player, &fonts)
+                    }
+                    None => self.render_answers_page(&mut layer, board_set, &fonts),
+                };
+                for (i, (top, height)) in rows.into_iter().enumerate() {
+                    regions.push(first + i, pages.len(), left, top, width, height);
+                }
+                pages.push(PdfPage::new(
+                    Mm(self.settings.page_width),
+                    Mm(self.settings.page_height),
+                    layer.into_ops(),
+                ));
+            }
+            first += board_set.len();
         }
 
         doc.with_pages(pages);
@@ -321,7 +323,7 @@ impl BiddingSheetsRenderer {
 
         // Compress PDF streams to reduce file size
         let compressed = compress_pdf(bytes.clone()).unwrap_or(bytes);
-        Ok(compressed)
+        Ok((compressed, regions.into_vec()))
     }
 
     /// Calculate available content height on a page (after banner and gaps)
@@ -508,13 +510,14 @@ impl BiddingSheetsRenderer {
     }
 
     /// Render a practice page (shows only one player's hand)
+    /// Returns each board's row as its top and height, in board order.
     fn render_practice_page(
         &self,
         layer: &mut LayerBuilder,
         boards: &[Board],
         player: Direction,
         fonts: &FontManager,
-    ) {
+    ) -> Vec<(f32, f32)> {
         // Draw page margin boundary for debugging
         self.draw_margin_debug_box(layer);
 
@@ -561,6 +564,7 @@ impl BiddingSheetsRenderer {
 
         let line_height = PRACTICE_FONT_SIZE * LINE_HEIGHT_MULTIPLIER * 0.4;
 
+        let mut rows = Vec::new();
         let board_count = boards.len();
         for (i, board) in boards.iter().enumerate() {
             let row_start_y = current_y;
@@ -657,12 +661,20 @@ impl BiddingSheetsRenderer {
                 );
             }
 
+            rows.push((box_top, box_height));
             current_y = row_start_y - row_height - ROW_GAP;
         }
+        rows
     }
 
-    /// Render an answers page (shows both hands + auction)
-    fn render_answers_page(&self, layer: &mut LayerBuilder, boards: &[Board], fonts: &FontManager) {
+    /// Render an answers page (shows both hands + auction). Returns each
+    /// board's row as its top and height, in board order.
+    fn render_answers_page(
+        &self,
+        layer: &mut LayerBuilder,
+        boards: &[Board],
+        fonts: &FontManager,
+    ) -> Vec<(f32, f32)> {
         // Draw page margin boundary for debugging
         self.draw_margin_debug_box(layer);
 
@@ -696,6 +708,7 @@ impl BiddingSheetsRenderer {
 
         let line_height = ANSWERS_FONT_SIZE * LINE_HEIGHT_MULTIPLIER * 0.4;
 
+        let mut rows = Vec::new();
         let board_count = boards.len();
         for (i, board) in boards.iter().enumerate() {
             let row_start_y = current_y;
@@ -841,8 +854,10 @@ impl BiddingSheetsRenderer {
                 );
             }
 
+            rows.push((box_top, box_height));
             current_y = row_start_y - row_height - ROW_GAP;
         }
+        rows
     }
 
     /// Render board context (board number, dealer, vulnerability, HCP)
