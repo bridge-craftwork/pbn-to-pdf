@@ -43,6 +43,9 @@ pub struct RenderOptions {
     /// headings and the `%PageFooter` lines -- for a pipeline that adds its
     /// own. Off by default, so output matches Bridge Composer's.
     pub omit_page_furniture: bool,
+    /// Force the HCP box on or off, whatever `%BCOptions ShowHCP` says, as the
+    /// CLI's `--hcp` and `--no-hcp` do. `None` leaves it to the file.
+    pub hcp_override: Option<bool>,
 }
 
 /// High-level API for rendering boards to PDF.
@@ -133,6 +136,10 @@ fn settings_for(metadata_comments: &[String], layout: Layout, options: RenderOpt
     settings.circle_length_winners = options.circle_length_winners;
     settings.section_commentary = options.section_commentary;
     settings.page_furniture = !options.omit_page_furniture;
+    if let Some(show) = options.hcp_override {
+        settings.hcp_override = Some(show);
+        settings.show_hcp = show;
+    }
     settings
 }
 
@@ -156,5 +163,31 @@ pub fn render_with_settings(
         Layout::DeclarersPlan => DeclarersPlanRenderer::new(settings).render_with_regions(boards),
         Layout::DealerSummary => DealerSummaryRenderer::new(settings).render_with_regions(boards),
         Layout::HandRecord => HandRecordRenderer::new(settings).render_with_regions(boards),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn show_hcp(file_asks: bool, hcp_override: Option<bool>) -> bool {
+        let comments = if file_asks {
+            vec!["%BCOptions ShowHCP".to_string()]
+        } else {
+            Vec::new()
+        };
+        let options = RenderOptions {
+            hcp_override,
+            ..Default::default()
+        };
+        settings_for(&comments, Layout::Analysis, options).show_hcp
+    }
+
+    #[test]
+    fn hcp_override_beats_the_file_and_none_leaves_it_to_the_file() {
+        assert!(show_hcp(true, None));
+        assert!(!show_hcp(false, None));
+        assert!(!show_hcp(true, Some(false)));
+        assert!(show_hcp(false, Some(true)));
     }
 }

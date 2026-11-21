@@ -82,6 +82,8 @@ impl From<WasmRenderOptions> for RenderOptions {
             // reason to ask for it, so it takes the matching default.
             section_commentary: false,
             omit_page_furniture: options.omit_page_furniture,
+            // The browser has no switch for it, so the file decides.
+            hcp_override: None,
         }
     }
 }
