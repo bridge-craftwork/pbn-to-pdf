@@ -242,13 +242,13 @@ impl<'a> ColumnCommentary<'a> {
 ///
 /// So the bit alone does not decide it: a lone opening lead still prints as
 /// one. The table itself is #42.
-fn opening_lead(board: &Board) -> Option<Card> {
+fn opening_lead(board: &Board, settings: &Settings) -> Option<Card> {
     if board.bc_flags.is_some_and(|f| f.show_trick()) {
         return None;
     }
     // The play-record table stands in the line's place, so asking for it here
     // keeps the two from ever both being drawn
-    if play_record(board).is_some() {
+    if play_record(board, settings).is_some() {
         return None;
     }
     board.play.as_ref()?.tricks.first()?.cards[0]
@@ -267,9 +267,13 @@ fn opening_lead(board: &Board) -> Option<Card> {
 /// -- unless it closes with `+`, which says the play is unfinished rather than
 /// unrecorded. Grant's *Squeeze 2 Practice* has six sections that are either
 /// longer than a lead or continued, and BridgeComposer draws six tables.
-fn play_record(board: &Board) -> Option<&PlaySequence> {
+///
+/// `settings.all_play_records` draws it for every board with something worth
+/// tabulating, flags or not: an export such as Brill's records the play of
+/// every table and carries no `BCFlags` at all.
+fn play_record<'a>(board: &'a Board, settings: &Settings) -> Option<&'a PlaySequence> {
     let play = board.play.as_ref()?;
-    let asked = board.bc_flags.is_some_and(|f| f.show_play());
+    let asked = settings.all_play_records || board.bc_flags.is_some_and(|f| f.show_play());
     let worth_it = played_card_count(play) > 1 || play.end == SectionEnd::Continued;
     (asked && worth_it).then_some(play)
 }
@@ -427,8 +431,8 @@ impl DocumentRenderer {
 
         // Auction height
         let has_contract = board.contract.is_some();
-        let has_lead = opening_lead(board).is_some();
-        let record = play_record(board);
+        let has_lead = opening_lead(board, &self.settings).is_some();
+        let record = play_record(board, &self.settings);
         let has_more_below = if self.settings.center {
             !commentary.below.is_empty()
         } else {
@@ -1241,7 +1245,7 @@ impl DocumentRenderer {
 
         // Render bidding table if present and enabled
         let has_contract = board.contract.is_some();
-        let has_lead = opening_lead(board).is_some();
+        let has_lead = opening_lead(board, &self.settings).is_some();
         let has_more_below = if self.settings.center {
             !commentary.below.is_empty()
         } else {
@@ -1357,7 +1361,7 @@ impl DocumentRenderer {
         // (issue #48), so they sit outside the auction branch. A column keeps
         // them at its left edge either way, which is where BridgeComposer puts
         // them.
-        let record = play_record(board);
+        let record = play_record(board, &self.settings);
         if !drew_auction && (has_contract || has_lead || record.is_some()) {
             current_y -= line_height;
         }
@@ -1381,7 +1385,7 @@ impl DocumentRenderer {
         }
 
         // Render opening lead
-        if let Some(lead_card) = opening_lead(board) {
+        if let Some(lead_card) = opening_lead(board, &self.settings) {
             let colors = SuitColors::new(self.settings.black_color, self.settings.red_color);
             self.render_lead(
                 layer,
@@ -1737,9 +1741,9 @@ impl DocumentRenderer {
         // [Contract] and [Play] whether or not the board has an [Auction]
         // (issue #48), so they sit outside the auction branch.
         let has_contract = board.contract.is_some();
-        let has_lead = opening_lead(board).is_some();
+        let has_lead = opening_lead(board, &self.settings).is_some();
 
-        let record = play_record(board);
+        let record = play_record(board, &self.settings);
         if has_contract || has_lead || record.is_some() {
             // Add spacing after the auction, or the diagram, before contract/lead
             content_y = Mm(content_y.0 - line_height);
@@ -1771,7 +1775,7 @@ impl DocumentRenderer {
             }
 
             // Render opening lead if play sequence exists
-            if let Some(lead_card) = opening_lead(board) {
+            if let Some(lead_card) = opening_lead(board, &self.settings) {
                 let colors = SuitColors::new(self.settings.black_color, self.settings.red_color);
                 self.render_lead(
                     layer,

@@ -39,6 +39,10 @@ pub struct RenderOptions {
     /// Draw commentary that stands inside an `[Auction]` or `[Play]` section.
     /// Bridge Composer discards it, so this is off unless a caller asks.
     pub section_commentary: bool,
+    /// Draw the play record of every board that has one (analysis layout),
+    /// not only those whose `BCFlags` ask for it. Off by default, matching
+    /// Bridge Composer.
+    pub all_play_records: bool,
     /// Leave out the page furniture the PBN asks for -- the event header or
     /// headings and the `%PageFooter` lines -- for a pipeline that adds its
     /// own. Off by default, so output matches Bridge Composer's.
@@ -132,6 +136,7 @@ fn settings_for(metadata_comments: &[String], layout: Layout, options: RenderOpt
     settings.circle_promotable_winners = options.circle_promotable_winners;
     settings.circle_length_winners = options.circle_length_winners;
     settings.section_commentary = options.section_commentary;
+    settings.all_play_records = options.all_play_records;
     settings.page_furniture = !options.omit_page_furniture;
     settings
 }

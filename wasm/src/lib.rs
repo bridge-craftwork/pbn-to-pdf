@@ -49,6 +49,10 @@ pub struct WasmRenderOptions {
     /// Circle length winners in blue.
     #[wasm_bindgen(js_name = circleLengthWinners)]
     pub circle_length_winners: bool,
+    /// Draw the play record of every board that has one (analysis layout),
+    /// not only those whose `BCFlags` ask for it.
+    #[wasm_bindgen(js_name = allPlayRecords)]
+    pub all_play_records: bool,
     /// Leave out the page furniture -- event header or headings and the
     /// `%PageFooter` lines. Off by default, matching Bridge Composer.
     #[wasm_bindgen(js_name = omitPageFurniture)]
@@ -81,6 +85,7 @@ impl From<WasmRenderOptions> for RenderOptions {
             // section data, which BridgeComposer leaves out. The browser has no
             // reason to ask for it, so it takes the matching default.
             section_commentary: false,
+            all_play_records: options.all_play_records,
             omit_page_furniture: options.omit_page_furniture,
         }
     }

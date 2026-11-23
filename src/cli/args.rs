@@ -54,6 +54,11 @@ pub struct Args {
     #[arg(long)]
     pub section_commentary: bool,
 
+    /// Draw the play record of every board that has one, not only those whose
+    /// BCFlags ask for it (analysis layout)
+    #[arg(long)]
+    pub all_play_records: bool,
+
     /// Hide HCP point counts
     /// Show HCP point counts even when the PBN does not ask for them
     #[arg(long, conflicts_with = "no_hcp")]
@@ -451,6 +456,7 @@ mod tests {
             no_play: false,
             no_commentary: false,
             section_commentary: false,
+            all_play_records: false,
             hcp: false,
             no_hcp: false,
             no_page_furniture: false,
@@ -493,6 +499,7 @@ mod tests {
             no_play: false,
             no_commentary: false,
             section_commentary: false,
+            all_play_records: false,
             hcp,
             no_hcp,
             no_page_furniture: false,
