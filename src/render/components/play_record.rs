@@ -101,6 +101,7 @@ impl<'a> PlayRecordRenderer<'a> {
         let font_size = self.settings.body_font_size;
         let pitch = self.column_pitch();
         let line_height = self.settings.line_height;
+        let leader_x = x + self.leader_offset(rows.len());
 
         // Heading row
         layer.set_fill_color(Color::Rgb(BLACK));
@@ -129,7 +130,7 @@ impl<'a> PlayRecordRenderer<'a> {
             layer.use_text_builtin(
                 seat_initial(trick.leader),
                 font_size,
-                Mm(x + LEADER_OFFSET * font_size * PT_TO_MM),
+                Mm(leader_x),
                 Mm(row_y),
                 self.font,
             );
@@ -161,6 +162,20 @@ impl<'a> PlayRecordRenderer<'a> {
         }
 
         Self::height(self.settings, play)
+    }
+
+    /// How far right of the trick number the leader's letter sits, in mm.
+    ///
+    /// BridgeComposer's fixed 12pt (at 12pt) clears "9." but not "10.", whose
+    /// dot then sits under the letter. So the letter moves right, for every
+    /// row alike so the letters stay in a column, when the widest number
+    /// needs it: past the number and a third of an em. Tables of nine tricks
+    /// or fewer are unchanged.
+    fn leader_offset(&self, rows: usize) -> f32 {
+        let font_size = self.settings.body_font_size;
+        let fixed = LEADER_OFFSET * font_size * PT_TO_MM;
+        let widest = self.measure(&format!("{rows}."));
+        fixed.max(widest + font_size * PT_TO_MM / 3.0)
     }
 
     fn measure(&self, text: &str) -> f32 {
