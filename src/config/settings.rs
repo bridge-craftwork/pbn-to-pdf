@@ -41,6 +41,9 @@ pub struct Settings {
     /// Draw the play-record table for every board that records its play, not
     /// only those whose `BCFlags` ask for it. Off, matching BridgeComposer.
     pub all_play_records: bool,
+    /// Draw the play record by seat (see `PlayRecordRenderer`), not in
+    /// BridgeComposer's play order.
+    pub play_by_seat: bool,
     /// Whether the HCP box is drawn. BridgeComposer draws it only when the
     /// file asks with `%BCOptions ShowHCP`, so this starts false and the PBN
     /// turns it on -- unless the command line decided, see `hcp_override`.
@@ -141,6 +144,7 @@ impl Default for Settings {
             show_commentary: true,
             section_commentary: false,
             all_play_records: false,
+            play_by_seat: false,
             show_hcp: false,
             hcp_override: None,
             show_card_table: true,
@@ -224,6 +228,7 @@ impl Settings {
             show_commentary: args.show_commentary(),
             section_commentary: args.section_commentary,
             all_play_records: args.all_play_records,
+            play_by_seat: args.play_by_seat,
             show_hcp: args.hcp_override().unwrap_or(false),
             hcp_override: args.hcp_override(),
             show_card_table: true,

@@ -169,6 +169,16 @@ will not respond to `"1"`.
 filename the embedded source should carry (`source.pbn` otherwise), or
 `opts.noEmbed = true` to leave it out, as the web app does for its previews.
 
+`opts.allPlayRecords` and `opts.playBySeat` are the CLI's `--all-play-records`
+and `--play-by-seat`, for the analysis layout.
+
+`renderPbnWithMap(pbn, layout, options?)` returns `{ pdf, clickMap }`: the PDF
+and its click map (each board's page and rectangle) as JSON, so a page needn't
+dig the map back out of the PDF. `sourceRecords(pbn)` gives each board's record
+in the text as flat `[start, end, ...]` JavaScript string indices; record `i` is
+board `i + 1` of the click map. The web app's Source view uses both: click a
+board in the PBN and the PDF goes to its page.
+
 For showing what a layout looks like before committing to it, use
 `renderPreview(pbn, layout, options?)`. It renders the opening boards
 positionally — `previewBoardCount(layout)` of them, which is 1 for the 1-up

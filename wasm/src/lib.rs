@@ -53,6 +53,9 @@ pub struct WasmRenderOptions {
     /// not only those whose `BCFlags` ask for it.
     #[wasm_bindgen(js_name = allPlayRecords)]
     pub all_play_records: bool,
+    /// Lay the play record out by seat, with double-dummy costs.
+    #[wasm_bindgen(js_name = playBySeat)]
+    pub play_by_seat: bool,
     /// Leave out the page furniture -- event header or headings and the
     /// `%PageFooter` lines. Off by default, matching Bridge Composer.
     #[wasm_bindgen(js_name = omitPageFurniture)]
@@ -86,6 +89,7 @@ impl From<WasmRenderOptions> for RenderOptions {
             // reason to ask for it, so it takes the matching default.
             section_commentary: false,
             all_play_records: options.all_play_records,
+            play_by_seat: options.play_by_seat,
             omit_page_furniture: options.omit_page_furniture,
         }
     }
@@ -147,6 +151,59 @@ pub fn render_pbn(
     render_selected(pbn, layout, options, |boards| {
         select_boards(boards, spec.as_deref())
     })
+    .map(|(pdf, _)| pdf)
+}
+
+/// A PDF with its Contract 5 click map: each board's page and rectangle.
+#[wasm_bindgen(js_name = RenderedPdf, getter_with_clone)]
+pub struct WasmRendered {
+    pub pdf: Vec<u8>,
+    /// `lesson-blocks.json` as embedded; empty when `noEmbed` was set.
+    #[wasm_bindgen(js_name = clickMap)]
+    pub click_map: String,
+}
+
+/// As [`render_pbn`], with the click map handed back alongside the PDF, so a
+/// page can tell which page each board landed on.
+#[wasm_bindgen(js_name = renderPbnWithMap)]
+pub fn render_pbn_with_map(
+    pbn: &str,
+    layout: &str,
+    options: Option<WasmRenderOptions>,
+) -> Result<WasmRendered, JsError> {
+    let options = options.unwrap_or_default();
+    let spec = options.boards.clone();
+    let (pdf, click_map) = render_selected(pbn, layout, options, |boards| {
+        select_boards(boards, spec.as_deref())
+    })?;
+    Ok(WasmRendered {
+        pdf,
+        click_map: click_map.unwrap_or_default(),
+    })
+}
+
+/// Where each board's record sits in `pbn`, as a flat array of UTF-16 offsets
+/// `[start0, end0, start1, end1, ...]` -- JavaScript string indices. Record
+/// `i` is board `i + 1` of a full render's click map. Empty if the text won't
+/// read as PBN.
+#[wasm_bindgen(js_name = sourceRecords)]
+pub fn source_records(pbn: &str) -> Vec<u32> {
+    let Some(spans) = pbn_to_pdf::source_records(pbn) else {
+        return Vec::new();
+    };
+    // Byte offsets to UTF-16 ones, walking the text once.
+    let mut out = Vec::with_capacity(spans.len() * 2);
+    let mut wanted: Vec<usize> = spans.iter().flat_map(|&(a, b)| [a, b]).collect();
+    wanted.reverse();
+    let mut units = 0u32;
+    for (byte, ch) in pbn.char_indices().chain(std::iter::once((pbn.len(), ' '))) {
+        while wanted.last() == Some(&byte) {
+            out.push(units);
+            wanted.pop();
+        }
+        units += ch.len_utf16() as u32;
+    }
+    out
 }
 
 /// Boards worth rendering to preview `layout` — see [`Layout::preview_boards`].
@@ -184,6 +241,7 @@ pub fn render_first_boards(
         boards.truncate(count);
         Ok(boards)
     })
+    .map(|(pdf, _)| pdf)
 }
 
 /// Render a preview of `layout`: its own [`preview_board_count`] of boards,
@@ -199,12 +257,13 @@ pub fn render_preview(
 }
 
 /// The shared body of the render entry points: parse, choose boards, render.
+/// The click map comes back with an embedded render.
 fn render_selected(
     pbn: &str,
     layout: &str,
     options: WasmRenderOptions,
     choose: impl FnOnce(Vec<(usize, Board)>) -> Result<Vec<(usize, Board)>, JsError>,
-) -> Result<Vec<u8>, JsError> {
+) -> Result<(Vec<u8>, Option<String>), JsError> {
     let layout = Layout::from_str(layout).map_err(|e| JsError::new(&e))?;
     let pbn_file = parse_pbn(pbn).map_err(|e| JsError::new(&e.to_string()))?;
 
@@ -231,6 +290,7 @@ fn render_selected(
 
     if options.no_embed {
         return render_boards(&boards, &metadata_comments, layout, options.into())
+            .map(|pdf| (pdf, None))
             .map_err(|e| JsError::new(&e.to_string()));
     }
     let name = options
@@ -249,6 +309,21 @@ fn render_selected(
         options.into(),
         &source,
     )
-    .map(|rendered| rendered.pdf)
+    .map(|rendered| (rendered.pdf, Some(rendered.click_map)))
     .map_err(|e| JsError::new(&e.to_string()))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn source_records_are_in_utf16_units() {
+        // "♠" is three bytes and one UTF-16 unit; "🂡" four bytes and two.
+        let pbn = "{♠🂡}\n[Board \"1\"]\n[Deal \"N:AKQJ.T98.765.432 - - -\"]\n";
+        let spans = source_records(pbn);
+        let utf16: Vec<u16> = pbn.encode_utf16().collect();
+        let record = String::from_utf16(&utf16[spans[0] as usize..spans[1] as usize]).unwrap();
+        assert!(record.contains("[Board \"1\"]"), "{record:?}");
+    }
 }

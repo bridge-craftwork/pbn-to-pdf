@@ -232,6 +232,26 @@ impl LayerBuilder {
         self.ops.push(Op::SetTransformationMatrix { matrix });
     }
 
+    /// A closed polygon through `points`, filled or stroked.
+    pub fn add_polygon(&mut self, points: &[(Mm, Mm)], mode: PaintMode) {
+        let points = points
+            .iter()
+            .map(|&(x, y)| LinePoint {
+                p: Point {
+                    x: x.into(),
+                    y: y.into(),
+                },
+                bezier: false,
+            })
+            .collect();
+        let polygon = Polygon {
+            rings: vec![PolygonRing { points }],
+            mode,
+            winding_order: WindingOrder::NonZero,
+        };
+        self.ops.push(Op::DrawPolygon { polygon });
+    }
+
     /// Draw a line from (x1, y1) to (x2, y2)
     pub fn add_line(&mut self, x1: Mm, y1: Mm, x2: Mm, y2: Mm) {
         let points = vec![

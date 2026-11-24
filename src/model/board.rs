@@ -74,6 +74,8 @@ pub struct Board {
 
     // Play
     pub play: Option<PlaySequence>,
+    /// The `[DoubleDummyPlay]` section: each played card's double-dummy cost
+    pub double_dummy_play: Option<bridge_types::DoubleDummyPlay>,
     pub result: Option<i8>,
 
     // Commentary
