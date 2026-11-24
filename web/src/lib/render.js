@@ -34,6 +34,8 @@ function buildOptions(engine, options, embed) {
   opts.circleSureWinners = !!options?.circleSureWinners
   opts.circlePromotableWinners = !!options?.circlePromotableWinners
   opts.circleLengthWinners = !!options?.circleLengthWinners
+  opts.allPlayRecords = !!options?.allPlayRecords
+  opts.playBySeat = !!options?.playBySeat
   if (embed) opts.sourceName = embed.sourceName
   else opts.noEmbed = true
   return opts
@@ -47,6 +49,38 @@ export async function renderBytes(pbn, layout, options, sourceName = 'source.pbn
   // is done. Yield first so a spinner the caller just set actually paints.
   await new Promise((r) => setTimeout(r, 0))
   return engine.renderPbn(pbn, layout, buildOptions(engine, options, { sourceName }))
+}
+
+/// -> { bytes, pages } for the whole file, where `pages[i]` is the page board
+/// `i` of the file (record `i` of `sourceRecords`) was drawn on, or 0 if it
+/// wasn't drawn.
+export async function renderWithPages(pbn, layout, options, sourceName = 'source.pbn') {
+  const engine = await loadEngine()
+  await new Promise((r) => setTimeout(r, 0))
+  const rendered = engine.renderPbnWithMap(pbn, layout, buildOptions(engine, options, { sourceName }))
+  const bytes = rendered.pdf
+  const map = JSON.parse(rendered.clickMap || '{"blocks":[]}')
+  rendered.free()
+  return { bytes, pages: pagesByBoard(map) }
+}
+
+/// The click map's blocks as a page per board. Its `board` is the board's
+/// place among those rendered, from 1; a board drawn twice keeps its first page.
+export function pagesByBoard(map) {
+  const pages = []
+  for (const block of map.blocks ?? []) {
+    if (block.kind !== 'board' || !(block.board >= 1)) continue
+    pages[block.board - 1] ||= block.page
+  }
+  return Array.from(pages, (p) => p ?? 0)
+}
+
+/// Each board's record in `pbn` as [start, end] string indices.
+export async function sourceRecords(pbn) {
+  const flat = (await loadEngine()).sourceRecords(pbn)
+  const out = []
+  for (let i = 0; i + 1 < flat.length; i += 2) out.push([flat[i], flat[i + 1]])
+  return out
 }
 
 /// -> { blob, url, bytes } for a rendered PDF. Caller revokes the URL.
@@ -78,6 +112,9 @@ export const layoutLabel = (id) =>
   })[id] ?? id
 
 export const usesCardArt = (id) => id.startsWith('declarers-plan')
+
+/// The layouts that draw play records.
+export const drawsPlay = (id) => id === 'analysis'
 
 /// Gallery order: the layouts a teacher reaches for most, first.
 export const LAYOUT_ORDER = [

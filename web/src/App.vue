@@ -3,11 +3,13 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import SourcePicker from '@/components/SourcePicker.vue'
 import LayoutGallery from '@/components/LayoutGallery.vue'
 import PdfView from '@/components/PdfView.vue'
+import SourceView from '@/components/SourceView.vue'
 import {
   DEFAULT_LESSON, VIEW_FOR_LAYOUT, fetchLibrary, fetchSetViews,
 } from '@/lib/baker.js'
 import {
-  layoutLabel, layouts, orderLayouts, renderBytes, renderPreviewBytes, usesCardArt,
+  drawsPlay, layoutLabel, layouts, orderLayouts, renderBytes, renderPreviewBytes,
+  renderWithPages, sourceRecords, usesCardArt,
 } from '@/lib/render.js'
 import { firstPageImage } from '@/lib/thumbnail.js'
 import { makeZip } from '@/lib/zip.js'
@@ -20,10 +22,17 @@ const version = __APP_VERSION__
 const source = ref(null)
 const gallery = ref([])            // [{ id, state, image, error, view }]
 const selected = ref([])
-const circles = ref({
+// Render options. Play by seat is on as in Bridge Viewer: it only shows where
+// play records are drawn, and is the easier one to read.
+const options = ref({
   circleSureWinners: false, circlePromotableWinners: false, circleLengthWinners: false,
+  allPlayRecords: false, playBySeat: true,
 })
-const result = ref(null)           // { url, name, bytes, count }
+const result = ref(null)           // { url, name, bytes, count, pbn?, pages? }
+const showSource = ref(false)
+const records = ref([])            // [[start, end]] per board, for View Source
+const sourceBoard = ref(-1)        // the record last clicked
+const sourcePage = ref(0)
 const working = ref(false)
 const error = ref('')
 const engineReady = ref(false)
@@ -41,6 +50,7 @@ function pbnFor(layout) {
 }
 
 const showCircles = computed(() => selected.value.some(usesCardArt))
+const showPlay = computed(() => selected.value.some(drawsPlay))
 
 const selectedLabels = computed(() =>
   orderLayouts(selected.value).map(layoutLabel).join(', '),
@@ -49,6 +59,9 @@ const selectedLabels = computed(() =>
 function revoke() {
   if (result.value) URL.revokeObjectURL(result.value.url)
   result.value = null
+  records.value = []
+  sourceBoard.value = -1
+  sourcePage.value = 0
 }
 onBeforeUnmount(revoke)
 
@@ -71,7 +84,7 @@ async function buildGallery() {
       continue
     }
     try {
-      const bytes = await renderPreviewBytes(pbn, entry.id, circles.value)
+      const bytes = await renderPreviewBytes(pbn, entry.id, options.value)
       const { url } = await firstPageImage(bytes)
       if (mine !== generation) return
       Object.assign(entry, { state: 'ready', image: url })
@@ -107,8 +120,9 @@ onMounted(async () => {
 watch(source, (s) => {
   if (s) buildGallery()
 })
-// Circling changes what a preview looks like, so the thumbnails must follow.
-watch(circles, () => source.value && buildGallery(), { deep: true })
+// Circling and the play options change what a preview looks like, so the
+// thumbnails must follow.
+watch(options, () => source.value && buildGallery(), { deep: true })
 watch(selected, revoke)
 
 // A thumbnail on a six-across row is too small to read. Enlarging re-renders
@@ -125,7 +139,7 @@ async function enlarge(id) {
   await nextTick()
   zoomDialog.value?.showModal()
   try {
-    const bytes = await renderPreviewBytes(pbn, id, circles.value)
+    const bytes = await renderPreviewBytes(pbn, id, options.value)
     const blob = new Blob([bytes], { type: 'application/pdf' })
     if (zoom.value?.id === id) zoom.value = { id, url: URL.createObjectURL(blob) }
   } catch (e) {
@@ -159,8 +173,15 @@ async function generate() {
     for (const layout of wanted) {
       const pbn = pbnFor(layout)
       if (!pbn) continue
-      const bytes = await renderBytes(pbn, layout, circles.value, `${source.value.stem}.pbn`)
-      files.push({ name: `${source.value.stem} - ${layoutLabel(layout)}.pdf`, bytes })
+      const name = `${source.value.stem} - ${layoutLabel(layout)}.pdf`
+      if (wanted.length === 1) {
+        // One PDF is shown, so keep where each board landed for View Source.
+        const { bytes, pages } = await renderWithPages(pbn, layout, options.value, `${source.value.stem}.pbn`)
+        files.push({ name, bytes, pbn, pages })
+      } else {
+        const bytes = await renderBytes(pbn, layout, options.value, `${source.value.stem}.pbn`)
+        files.push({ name, bytes })
+      }
     }
     if (!files.length) throw new Error('Nothing could be rendered from this selection.')
 
@@ -169,7 +190,9 @@ async function generate() {
       result.value = {
         url: URL.createObjectURL(blob), name: files[0].name,
         bytes: files[0].bytes.length, count: 1,
+        pbn: files[0].pbn, pages: files[0].pages ?? [],
       }
+      if (showSource.value) loadRecords()
     } else {
       const blob = makeZip(
         files,
@@ -189,6 +212,27 @@ async function generate() {
   } finally {
     working.value = false
   }
+}
+
+async function loadRecords() {
+  const pbn = result.value?.pbn
+  if (!pbn || records.value.length) return
+  try {
+    const found = await sourceRecords(pbn)
+    if (result.value?.pbn === pbn) records.value = found
+  } catch {
+    // The source still shows, just without boards to click.
+  }
+}
+
+watch(showSource, (on) => on && loadRecords())
+
+function selectRecord(index) {
+  sourceBoard.value = index
+  const page = result.value?.pages?.[index]
+  // Clear first, so a second click on the same board goes back to it.
+  sourcePage.value = 0
+  if (page) nextTick(() => (sourcePage.value = page))
 }
 
 const sizeLabel = computed(() =>
@@ -273,9 +317,18 @@ const sizeLabel = computed(() =>
 
           <fieldset v-if="showCircles">
             <legend>Circle winners</legend>
-            <label><input v-model="circles.circleSureWinners" type="checkbox" /> Sure (red)</label>
-            <label><input v-model="circles.circlePromotableWinners" type="checkbox" /> Promotable (green)</label>
-            <label><input v-model="circles.circleLengthWinners" type="checkbox" /> Length (blue)</label>
+            <label><input v-model="options.circleSureWinners" type="checkbox" /> Sure (red)</label>
+            <label><input v-model="options.circlePromotableWinners" type="checkbox" /> Promotable (green)</label>
+            <label><input v-model="options.circleLengthWinners" type="checkbox" /> Length (blue)</label>
+          </fieldset>
+          <fieldset v-if="showPlay">
+            <legend>Play records</legend>
+            <label title="Draw every board's play, not only those the file's BCFlags ask for">
+              <input v-model="options.allPlayRecords" type="checkbox" /> Every board
+            </label>
+            <label title="One column per player; with a [DoubleDummyPlay] section, each card that cost a trick is marked">
+              <input v-model="options.playBySeat" type="checkbox" /> By seat
+            </label>
           </fieldset>
         </div>
       </template>
@@ -289,11 +342,31 @@ const sizeLabel = computed(() =>
           3. {{ result.count > 1 ? `${result.count} PDFs` : 'Your PDF' }}
           <span class="muted">({{ sizeLabel }})</span>
         </h2>
+        <button
+          v-if="result.pbn"
+          class="sourcebtn"
+          :class="{ on: showSource }"
+          :aria-pressed="showSource"
+          title="Show the PBN beside the PDF; click a board to go to its page"
+          @click="showSource = !showSource"
+        >
+          &lt;/&gt; Source
+        </button>
         <a class="download" :href="result.url" :download="result.name">
           Download {{ result.count > 1 ? '.zip' : 'PDF' }}
         </a>
       </div>
-      <PdfView v-if="result.count === 1" :url="result.url" title="Rendered PDF" />
+      <div v-if="result.count === 1" class="resultbody" :class="{ split: showSource && result.pbn }">
+        <SourceView
+          v-if="showSource && result.pbn"
+          :text="result.pbn"
+          :records="records"
+          :pages="result.pages"
+          :highlighted="sourceBoard"
+          @select="selectRecord"
+        />
+        <PdfView :url="result.url" :page="sourcePage" title="Rendered PDF" />
+      </div>
       <p v-else class="muted zipnote">{{ result.name }} — one PDF per layout you ticked.</p>
     </section>
   </main>
@@ -391,6 +464,13 @@ fieldset label {
   background: var(--accent); color: var(--accent-ink); text-decoration: none;
   font-weight: 600; border-radius: var(--radius); padding: 0.45rem 0.9rem;
   white-space: nowrap; margin-left: auto;
+}
+.sourcebtn { padding: 0.35rem 0.7rem; font-size: 0.88rem; margin-left: auto; }
+.sourcebtn.on { border-color: var(--accent); color: var(--accent); }
+.sourcebtn + a.download { margin-left: 0; }
+.resultbody.split { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 3fr); gap: 0.6rem; }
+@media (max-width: 52rem) {
+  .resultbody.split { grid-template-columns: minmax(0, 1fr); }
 }
 .zoombody { padding: 0; }
 .zoombody p { margin: auto; }

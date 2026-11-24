@@ -8,12 +8,14 @@
 // Pages are drawn only when they near the visible area, and a page far out of
 // view gives its canvas back. An iPad caps the total canvas memory a tab may
 // hold, and a long lesson drawn all at once at retina resolution exceeds it.
-import { onBeforeUnmount, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { pdfjs } from '@/lib/pdfjs.js'
 
 const props = defineProps({
   url: { type: String, required: true },
   title: { type: String, default: 'PDF' },
+  // A page to show, from 1. Changing it scrolls there; 0 leaves the view alone.
+  page: { type: Number, default: 0 },
 })
 
 // iPadOS reports itself as a Mac, so tell them apart by touch.
@@ -117,6 +119,20 @@ function teardown() {
 }
 
 if (!native) watch(() => props.url, load, { immediate: true })
+
+// The browser's own viewer takes the page from the URL's fragment, but only
+// when it loads: Chrome ignores a later change to it. So a new page reloads the
+// frame (keyed on its src); the PDF is a blob already in memory.
+const frameSrc = computed(() => (props.page ? `${props.url}#page=${props.page}` : props.url))
+
+watch(
+  () => props.page,
+  (page) => {
+    if (native || !page) return
+    const canvas = box.value?.querySelector(`canvas[data-page="${page - 1}"]`)
+    if (canvas) box.value.scrollTop = canvas.offsetTop - 8
+  },
+)
 onBeforeUnmount(() => {
   generation++
   teardown()
@@ -124,7 +140,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <iframe v-if="native" class="pdfview" :src="url" :title="title"></iframe>
+  <iframe v-if="native" :key="frameSrc" class="pdfview" :src="frameSrc" :title="title"></iframe>
   <div v-else ref="box" class="pdfview pages" role="document" :aria-label="title">
     <p v-if="error" class="error">{{ error }}</p>
     <p v-else-if="!pages.length" class="muted">Loading…</p>
@@ -144,7 +160,7 @@ onBeforeUnmount(() => {
   border-radius: var(--radius); background: #fff;
 }
 .pages {
-  overflow-y: auto; overscroll-behavior: contain;
+  position: relative; overflow-y: auto; overscroll-behavior: contain;
   background: var(--line); padding: 0.5rem;
   display: flex; flex-direction: column; gap: 0.5rem;
 }

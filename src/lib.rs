@@ -5,6 +5,7 @@ pub mod error;
 pub mod model;
 pub mod parser;
 pub mod render;
+pub mod source;
 
 pub use cli::Layout;
 pub use config::Settings;
@@ -13,6 +14,7 @@ pub use error::{PbnError, RenderError};
 pub use model::Board;
 pub use parser::{parse_pbn, PbnFile};
 pub use render::generate_pdf;
+pub use source::source_records;
 
 use parser::header::parse_headers;
 use render::helpers::BoardRegion;
@@ -43,6 +45,11 @@ pub struct RenderOptions {
     /// not only those whose `BCFlags` ask for it. Off by default, matching
     /// Bridge Composer.
     pub all_play_records: bool,
+    /// Lay the play record out one column per seat, clockwise from the
+    /// opening leader, with each card's double-dummy cost when the file has
+    /// a `[DoubleDummyPlay]` section. Off by default: Bridge Composer's table
+    /// runs in play order.
+    pub play_by_seat: bool,
     /// Leave out the page furniture the PBN asks for -- the event header or
     /// headings and the `%PageFooter` lines -- for a pipeline that adds its
     /// own. Off by default, so output matches Bridge Composer's.
@@ -137,6 +144,7 @@ fn settings_for(metadata_comments: &[String], layout: Layout, options: RenderOpt
     settings.circle_length_winners = options.circle_length_winners;
     settings.section_commentary = options.section_commentary;
     settings.all_play_records = options.all_play_records;
+    settings.play_by_seat = options.play_by_seat;
     settings.page_furniture = !options.omit_page_furniture;
     settings
 }

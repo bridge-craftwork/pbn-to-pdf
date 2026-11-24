@@ -11,6 +11,7 @@ use crate::render::components::bidding_table::BiddingTableRenderer;
 use crate::render::components::commentary::{CommentaryRenderer, FloatLayout};
 use crate::render::components::hand_diagram::{DiagramDisplayOptions, HandDiagramRenderer};
 use crate::render::components::page_furniture::PageFurniture;
+use crate::render::components::play_by_seat::SeatPlayRenderer;
 use crate::render::components::play_record::PlayRecordRenderer;
 use crate::render::helpers::colors::{SuitColors, BLACK};
 use crate::render::helpers::compress::compress_pdf;
@@ -511,7 +512,11 @@ impl DocumentRenderer {
 
         // The play-record table stands where the lead line would (issue #42)
         if let Some(play) = record {
-            height += PlayRecordRenderer::height(&self.settings, play);
+            height += if self.settings.play_by_seat {
+                SeatPlayRenderer::height(&self.settings, board, column_width)
+            } else {
+                PlayRecordRenderer::height(&self.settings, play)
+            };
             if has_more_below {
                 height += line_height;
             }
@@ -1404,12 +1409,21 @@ impl DocumentRenderer {
 
         // The play-record table stands where the Lead: line would (issue #42)
         if let Some(play) = record {
-            let recorder = PlayRecordRenderer::new(
-                hand_record_fonts.regular,
-                fonts.symbol_font(),
-                &self.settings,
-            );
-            current_y -= recorder.render(layer, play, column_x, current_y);
+            current_y -= if self.settings.play_by_seat {
+                SeatPlayRenderer::new(
+                    hand_record_fonts.regular,
+                    fonts.symbol_font(),
+                    &self.settings,
+                )
+                .render(layer, board, column_x, current_y, column_width)
+            } else {
+                PlayRecordRenderer::new(
+                    hand_record_fonts.regular,
+                    fonts.symbol_font(),
+                    &self.settings,
+                )
+                .render(layer, play, column_x, current_y)
+            };
             if has_more_below {
                 current_y -= line_height;
             }
@@ -1798,12 +1812,28 @@ impl DocumentRenderer {
 
             // The play-record table stands where the Lead: line would (#42)
             if let Some(play) = record {
-                let recorder = PlayRecordRenderer::new(
-                    hand_record_fonts.regular,
-                    fonts.symbol_font(),
-                    &self.settings,
-                );
-                content_y = Mm(content_y.0 - recorder.render(layer, play, contract_x, content_y.0));
+                let used = if self.settings.play_by_seat {
+                    SeatPlayRenderer::new(
+                        hand_record_fonts.regular,
+                        fonts.symbol_font(),
+                        &self.settings,
+                    )
+                    .render(
+                        layer,
+                        board,
+                        contract_x,
+                        content_y.0,
+                        margin_left + self.settings.content_width() - contract_x,
+                    )
+                } else {
+                    PlayRecordRenderer::new(
+                        hand_record_fonts.regular,
+                        fonts.symbol_font(),
+                        &self.settings,
+                    )
+                    .render(layer, play, contract_x, content_y.0)
+                };
+                content_y = Mm(content_y.0 - used);
             }
         }
 

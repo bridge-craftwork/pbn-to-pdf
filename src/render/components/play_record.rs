@@ -64,7 +64,7 @@ impl<'a> PlayRecordRenderer<'a> {
     ///
     /// A section closes with `*`, and a trick may hold nothing but placeholders,
     /// so the tail of `tricks` is often empty.
-    fn rows(play: &PlaySequence) -> &[crate::model::Trick] {
+    pub fn rows(play: &PlaySequence) -> &[crate::model::Trick] {
         let last = play
             .tricks
             .iter()

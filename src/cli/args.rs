@@ -59,6 +59,11 @@ pub struct Args {
     #[arg(long)]
     pub all_play_records: bool,
 
+    /// Lay the play record out one column per seat, with double-dummy costs
+    /// from a [DoubleDummyPlay] section (analysis layout)
+    #[arg(long)]
+    pub play_by_seat: bool,
+
     /// Hide HCP point counts
     /// Show HCP point counts even when the PBN does not ask for them
     #[arg(long, conflicts_with = "no_hcp")]
@@ -457,6 +462,7 @@ mod tests {
             no_commentary: false,
             section_commentary: false,
             all_play_records: false,
+            play_by_seat: false,
             hcp: false,
             no_hcp: false,
             no_page_furniture: false,
@@ -500,6 +506,7 @@ mod tests {
             no_commentary: false,
             section_commentary: false,
             all_play_records: false,
+            play_by_seat: false,
             hcp,
             no_hcp,
             no_page_furniture: false,

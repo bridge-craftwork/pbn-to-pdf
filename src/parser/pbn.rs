@@ -98,6 +98,7 @@ fn adapt_board(src: bridge_types::Board) -> Board {
         contract: None,
         declarer: src.declarer,
         play: src.play,
+        double_dummy_play: src.double_dummy_play,
         result: src.result,
         commentary: src
             .commentary
