@@ -30,7 +30,8 @@ mod tests {
 
     #[test]
     fn each_board_has_its_own_record() {
-        let text = "% header\n[Event \"x\"]\n[Board \"1\"]\n[Deal \"N:AKQJ.T98.765.432 - - -\"]\n\n\
+        let text =
+            "% header\n[Event \"x\"]\n[Board \"1\"]\n[Deal \"N:AKQJ.T98.765.432 - - -\"]\n\n\
                     [Board \"2\"]\n[Deal \"N:AKQJ.T98.765.432 - - -\"]\n";
         let spans = source_records(text).unwrap();
         assert_eq!(spans.len(), 2);

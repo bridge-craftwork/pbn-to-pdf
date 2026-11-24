@@ -664,7 +664,10 @@ mod tests {
         assert_eq!(legend_rows(&settings, &widths, 200.0), vec![0..4]);
         // Just short of all four with no gaps: the last goes to a second line
         let total: f32 = widths.iter().sum();
-        assert_eq!(legend_rows(&settings, &widths, total - 0.1), vec![0..3, 3..4]);
+        assert_eq!(
+            legend_rows(&settings, &widths, total - 0.1),
+            vec![0..3, 3..4]
+        );
         // An entry wider than the column still gets a line of its own
         assert_eq!(legend_rows(&settings, &widths, 1.0).len(), 4);
     }
